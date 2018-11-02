@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+
+# To get an unencrypted PEM (without passphrase):
+# openssl rsa -in certificate.pem -out certificate_unencrypted.pem
+
+import os, sys, time, serial, argparse, requests
+from struct import unpack, unpack_from, pack_into, pack
+from base64 import b64encode
+
+parser = argparse.ArgumentParser(description='EPOS Serial->IoT Gateway')
+
+parser.add_argument('-d','--dev', help='EPOSMote III device descriptor file', default='/dev/ttyACM0')
+parser.add_argument('-t','--timeout', help='Timeout for reading from mote', default=600)
+parser.add_argument('-u','--url', help='Post URL', default='https://iot.lisha.ufsc.br/api/put.php')
+parser.add_argument('-a','--attach_url', help='Attach URL', default='https://iot.lisha.ufsc.br/api/attach.php')
+parser.add_argument('-j','--json', help='Use JSON API', action='store_true')
+parser.add_argument('-D','--domain', help='Data domain', default='')
+parser.add_argument('-U','--username', help='Data domain username', default='')
+parser.add_argument('-P','--password', help='User password', default='')
+parser.add_argument('-c','--certificate', help='Client certificate', default='')
+parser.add_argument('-s','--slice_mngr_url', help='Slice Manager URL', default='')
+parser.add_argument('-n','--no_setup', help='Does not perform setup step, which make the clock synchronization', action='store_false')
+parser.add_argument('-g','--debug', help='Only Debug', action='store_true')
+parser.add_argument('-b','--batch', help='Batch Size', default=1)
+
+args = vars(parser.parse_args())
+DEV = args['dev']
+TIMEOUT = int(args['timeout'])
+URL = args['url']
+ATTACH_URL = args['attach_url']
+JSON = args['json']
+DOMAIN   = args['domain']
+USERNAME = args['username']
+PASSWORD = args['password']
+MY_CERTIFICATE = [args['certificate']+'.pem', args['certificate']+'.key']
+SLICE_MNGR_URL = args['slice_mngr_url']
+SETUP = args['no_setup']
+ONLY_DEBUG = args['debug']
+BATCH = int(args['batch'])
+
+if BATCH < 0:
+    raise ValueError('Batch Size cannot be negative')
+
+if DOMAIN or USERNAME or PASSWORD:
+    if JSON:
+        CREDENTIALS = {}
+        if DOMAIN:
+            CREDENTIALS['domain'] = DOMAIN
+        if USERNAME:
+            CREDENTIALS['username'] = USERNAME
+        if PASSWORD:
+            CREDENTIALS['password'] = PASSWORD
+    else:
+        if DOMAIN and USERNAME and PASSWORD:
+            s_d = pack('<B', len(DOMAIN))
+            s_u = pack('<B', len(USERNAME))
+            s_p = pack('<B', len(PASSWORD))
+            CREDENTIALS = s_d+bytes(DOMAIN, 'utf-8')+s_u+bytes(USERNAME, 'utf-8')+s_p+bytes(PASSWORD, 'utf-8')
+        else:
+            CREDENTIALS = False
+else:
+    CREDENTIALS = False
+
+if JSON:
+    import json
+    import struct
+
+def init_mote():
+    global DEV
+    global TIMEOUT
+
+    ok = False
+    while not ok:
+        try:
+            # time.sleep(3)
+            print("Waiting for", DEV, "to appear")
+            while not os.path.exists(DEV) or not os.access(DEV, os.W_OK):
+                # print("Waiting for", DEV, "to appear")
+                # if os.path.exists(DEV):
+                #     print("exists")
+                # else:
+                #     print("not exists")
+                # if os.access(DEV, os.W_OK):
+                #     print("writeable")
+                # else:
+                #     print("now writeable")
+                time.sleep(3)
+            mote = serial.Serial(DEV, 115200, timeout = TIMEOUT, write_timeout = 10)
+            mote.close()
+            mote.open()
+            ok = True
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print("Exception caught:", e, file=sys.stderr)
+            ok = False
+            time.sleep(3)
+
+    print("Mote open", file=sys.stderr)
+    if(SETUP):
+        ts = int(time.time() * 1000000)
+        str_ts = bytearray(8)
+        pack_into('<Q', str_ts, 0, ts)
+        try:
+            mote.write(b'YYYX'+str_ts)
+            print("epoch written", file=sys.stderr)
+        except KeyboardInterrupt:
+            raise
+        except serial.serialutil.SerialTimeoutException:
+            pass
+
+    print("init_mote() done", file=sys.stderr)
+    return mote
+
+def series_to_json(data):
+    offset = 0
+    version, unit, x, y, z, r, t0, t1, dev = unpack_from('<BIiiiIQQL',data,offset)
+    ret_obj = {
+            'series' :
+            {
+                'version' : version,
+                'unit' : unit,
+                'x' : x,
+                'y' : y,
+                'z' : z,
+                'r' : r,
+                't0' : t0,
+                't1' : t1,
+                'dev' : dev
+            }
+        }
+
+    if CREDENTIALS:
+        ret_obj['credentials'] = CREDENTIALS
+    return json.dumps(ret_obj)
+
+def smartdata_to_json(data):
+    offset = 0
+    version,unit = unpack_from('<BI',data,offset)
+    offset = offset+1+4
+
+    if (unit >> 31) == 1:
+        # SI Unit
+        size_v = 8;
+        value  = unpack("<d", data[offset:offset+size_v])[0]
+    else:
+        # Digital Unit
+        size_v = unit & 0xFFFF;
+        value  = unpack("%ds"%size_v, data[offset:offset+size_v])[0]
+        value = b64encode(value).decode('utf-8')
+    offset = offset + size_v;
+
+    error, confidence, x, y, z, t, dev = unpack_from('<2B3iQL',data,offset)
+
+    ret_obj = {
+                    'version' : version,
+                    'unit' : unit,
+                    'value' : value,
+                    'error' : error,
+                    'confidence' : confidence,
+                    'x' : x,
+                    'y' : y,
+                    'z' : z,
+                    't' : t,
+                    'dev' : dev
+                }
+    return ret_obj
+
+from threading import Thread
+from multiprocessing import JoinableQueue
+to_be_parsed = JoinableQueue(2000)
+to_be_published = JoinableQueue(2000)
+
+class PublisherThread(Thread):
+    def run(self):
+        global to_be_published
+        session = requests.Session()
+        if JSON:
+            session.headers = {'Content-type' : 'application/json'}
+        else:
+            session.headers = {'Connection': 'close', 'Content-type' : 'application/octet-stream', 'Content-length' : 0}
+
+        if MY_CERTIFICATE[0] != '.pem':
+            session.cert = MY_CERTIFICATE
+
+        count = 0
+
+        while True:
+            if count == 0:
+                if JSON:
+                    payload = { 'smartdata' : [ ] }
+                    if CREDENTIALS:
+                        payload['credentials'] = CREDENTIALS
+                else:
+                    if CREDENTIALS:
+                        payload = CREDENTIALS
+                    else:
+                        payload = ""
+
+            entry = to_be_published.get()
+            #print("To_be_published Queue size: ", to_be_published.qsize())
+            db_x = entry['db_x']
+            data = entry['data']
+
+            try:
+                if db_x == b'S': # DB_Series
+                    if ONLY_DEBUG:
+                        print("Attach [] (", len(data), ") ", data, sep='')
+                    else:
+                        if not JSON:
+                            session.headers['Content-length'] = str(len(data))
+                            if CREDENTIALS:
+                                data = CREDENTIALS+data
+                        response = session.post(ATTACH_URL, data)
+                        print("Attach [", str(response.status_code), "] (", len(data), ") ", data, sep='')
+
+                elif db_x == b'R': # DB_Record
+                    if JSON:
+                        payload['smartdata'].append(data)
+                    else:
+                        payload = payload+data
+
+                    count = count + 1
+
+                    if SLICE_MNGR_URL != '' and JSON:
+                        if(ONLY_DEBUG):
+                            print("Put in Slice [] (", len(data), ") ", data, sep='')
+                        else:
+                            slice_mngr_data = json.dumps({ 'smartdata' : [ data ] })
+                            response = session.post(SLICE_MNGR_URL, slice_mngr_data)
+                            print("Put in Slice [", str(response.status_code), "] (", len(data), ") ", data, sep='')
+
+                    if count >= BATCH:
+                        if not JSON:
+                            session.headers['Content-length'] = str(len(payload))
+                        else:
+                            payload = json.dumps(payload)
+
+                        if ONLY_DEBUG:
+                            print("Put [] (", len(payload), ") ", payload, sep='')
+                        else:
+                            response = session.post(URL, payload)
+                            print("Put [", str(response.status_code), "] (", len(payload), ") ", payload, sep='')
+                        count = 0
+                else:
+                    print("Invalid data: ", data, file=sys.stderr)
+            except Exception as e:
+                mote.close()
+                print("Exception caught:", e, file=sys.stderr)
+
+            to_be_published.task_done()
+
+class ParserThread(Thread):
+    def run(self):
+        global to_be_parsed
+        global to_be_published
+
+        while True:
+            entry = to_be_parsed.get()
+            #print("To_be_parsed Queue size: ", to_be_parsed.qsize())
+            db_x = entry['db_x']
+            data = entry['data']
+
+            try:
+                if db_x == b'S': # DB_Series
+                    if JSON:
+                         data = series_to_json(data)
+                elif db_x == b'R': # DB_Record
+                    if JSON:
+                        data = smartdata_to_json(data)
+                else:
+                    print("Invalid data: ", data, file=sys.stderr)
+            except Exception as e:
+                print("Exception caught:", e, file=sys.stderr)
+            to_be_published.put({'db_x' : db_x, 'data' : data})
+            to_be_parsed.task_done()
+
+class ReceiverThread(Thread):
+    def run(self):
+        global to_be_parsed
+        mote = init_mote()
+
+        while True:
+            sys.stdout.flush()
+            X = 0
+            db_x = b''
+            data = b''
+            try:
+                db_x = mote.read(1)
+                while X < 3:
+                    byte = mote.read(1)
+                    data = data + byte
+                    if byte == b'X':
+                        X = X + 1
+                    else:
+                        X = 0
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                print("Exception caught:", e, file=sys.stderr)
+                data = b''
+
+            if X == 3 and len(data):
+                data = data[:-X] # discard the X's at the end
+
+            if not len(data):
+                mote.close()
+                mote = init_mote()
+            else:
+                to_be_parsed.put({'db_x' : db_x, 'data' : data})
+
+            # time.sleep(0.8)
+
+
+if __name__ == "__main__":
+    ReceiverThread().start()
+    ParserThread().start()
+    PublisherThread().start()
