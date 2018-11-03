@@ -36,41 +36,86 @@ const uint32_t SecP256Info::y[] = {
     0x37BF51F5, 0xCBB64068, 0x6B315ECE, 0x2BCE3357,
     0x7C0F9E16, 0x8EE7EB4A, 0xFE1A7F9B, 0x4FE342E2 };
 
+struct SecP192Info {
+    static const uint8_t size = 6;
+    static const uint32_t prime[];
+    static const uint32_t n[];
+    static const uint32_t a[];
+    static const uint32_t b[];
+    static const uint32_t x[];
+    static const uint32_t y[];
+};
+
+const uint32_t SecP192Info::prime[] = {
+    0xffffffff, 0xffffffff, 0xfffffffe, 0xffffffff, 0xffffffff, 0xffffffff };
+const uint32_t SecP192Info::n[] = {
+    0xb4d22831, 0x146bc9b1, 0x99def836, 0xffffffff, 0xffffffff, 0xffffffff };
+const uint32_t SecP192Info::a[] = {
+    0xfffffffc, 0xffffffff, 0xfffffffe, 0xffffffff, 0xffffffff, 0xffffffff };
+const uint32_t SecP192Info::b[] = {
+    0xc146b9b1, 0xfeb8deec, 0x72243049, 0x0fa7e9ab, 0xe59c80e7, 0x64210519 };
+const uint32_t SecP192Info::x[] = {
+    0x82ff1012, 0xf4ff0afd, 0x43a18800, 0x7cbf20eb, 0xb03090f6, 0x188da80e };
+const uint32_t SecP192Info::y[] = {
+    0x1e794811, 0x73f977a1, 0x6b24cdd5, 0x631011ed, 0xffc8da78, 0x07192b95 };
+
+struct SecP256k1Info {
+    static const uint8_t size = 8;
+    static const uint32_t prime[];
+    static const uint32_t n[];
+    static const uint32_t a[];
+    static const uint32_t b[];
+    static const uint32_t x[];
+    static const uint32_t y[];
+};
+
+const uint32_t SecP256k1Info::prime[] = {
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFC2F };
+const uint32_t SecP256k1Info::n[] = {
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFE,
+    0xBAAEDCE6, 0xAF48A03B, 0xBFD25E8C, 0xD0364141 };
+const uint32_t SecP256k1Info::a[] = {
+    0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000 };
+const uint32_t SecP256k1Info::b[] = {
+    0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00000000, 0x00000000, 0x00000000, 0x00000007 };
+const uint32_t SecP256k1Info::x[] = {
+    0x79BE667E, 0xF9DCBBAC, 0x55A06295, 0xCE870B07,
+    0x029BFCDB, 0x2DCE28D9, 0x59F2815B, 0x16F81798 };
+const uint32_t SecP256k1Info::y[] = {
+    0x483ADA77, 0x26A3C465, 0x5DA4FBFC, 0x0E1108A8,
+    0xFD17B448, 0xA6855419, 0x9C47D08F, 0xFB10D4B8 };
+
+
 template<typename Curve>
 class ECPoint {
 
 public:
-    typedef uint8_t tPKAStatus;
+    typedef uint8_t PKAStatus;
     typedef HWBignum Scalar;
 
     ECPoint() {
-        x = new uint32_t[Curve::size];
-        y = new uint32_t[Curve::size];
-        for (uint8_t i = 0; i < Curve::size; i++) {
-            x[i] = Curve::x[i];
-            y[i] = Curve::y[i];
-        }
+        memcpy(x, Curve::x, Curve::size * sizeof(*Curve::x));
+        memcpy(y, Curve::y, Curve::size * sizeof(*Curve::y));
     }
 
     ECPoint(const ECPoint& other) {
-        for (uint8_t i = 0; i < Curve::size; i++) {
-            x[i] = other.x[i];
-            y[i] = other.y[i];
-        }
+        memcpy(x, other.x, Curve::size * sizeof(*Curve::x));
+        memcpy(y, other.y, Curve::size * sizeof(*Curve::y));
     }
 
     ECPoint& operator=(const ECPoint& other) {
-        for (uint8_t i = 0; i < Curve::size; i++) {
-            x[i] = other.x[i];
-            y[i] = other.y[i];
-        }
+        memcpy(x, other.x, Curve::size * sizeof(*Curve::x));
+        memcpy(y, other.y, Curve::size * sizeof(*Curve::y));
         return *this;
     }
 
     ECPoint& operator*=(const Scalar& x) {
         uint32_t res_addr = 0;
         ecc_mul_start(x, res_addr);
-        tPKAStatus op_status = 0;
+        PKAStatus op_status = 0;
         do {
             op_status = ecc_mul_result(res_addr);
         } while (op_status == PKA_STATUS_OPERATION_INPRG);
@@ -80,7 +125,7 @@ public:
     ECPoint operator+(const ECPoint& p) {
         uint32_t res_addr = 0;
         ecc_add_start(p, res_addr);
-        tPKAStatus op_status = 0;
+        PKAStatus op_status = 0;
         ECPoint result;
         do {
             op_status = ecc_add_result(result, res_addr);
@@ -89,14 +134,10 @@ public:
     }
 
     bool operator==(const ECPoint& other) {
-        for (uint8_t i = 0; i < Curve::size; i++) {
-            if (x[i] != other.x[i])
-                return false;
-
-            // Is this needed???
-            if (y[i] != other.y[i])
-                return false;
-        }
+        if (memcmp(x, other.x, Curve::size * sizeof(*Curve::x)) != 0)
+            return false;
+        if (memcmp(y, other.y, Curve::size * sizeof(*Curve::y)) != 0)
+            return false;
         return true;
     }
 
@@ -116,20 +157,15 @@ public:
 
 private:
 
-    tPKAStatus ecc_mul_start(const Scalar& scalar, uint32_t& result_vector) {
-        uint8_t extraBuf;
-        uint32_t offset;
-        int i;
-
-        offset = 0;
+    PKAStatus ecc_mul_start(const Scalar& scalar, uint32_t& result_vector) {
+        /* Calculate the extra buffer requirement. */
+        uint8_t extra_buf_size = 2 + Curve::size % 2, i;
+        uint32_t offset = 0;
 
         /* Make sure no PKA operation is in progress. */
         if((HWREG(PKA_FUNCTION) & PKA_FUNCTION_RUN) != 0) {
             return PKA_STATUS_OPERATION_INPRG;
         }
-
-        /* Calculate the extra buffer requirement. */
-        extraBuf = 2 + Curve::size % 2;
 
         /* Update the A ptr with the offset address of the PKA RAM location
          * where the scalar will be stored. */
@@ -154,7 +190,7 @@ private:
         }
 
         /* Determine the offset for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Copy curve parameter 'a' in PKA RAM. */
         for(i = 0; i < Curve::size; i++) {
@@ -162,7 +198,7 @@ private:
         }
 
         /* Determine the offset for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Copy curve parameter 'b' in PKA RAM. */
         for(i = 0; i < Curve::size; i++) {
@@ -170,7 +206,7 @@ private:
         }
 
         /* Determine the offset for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Update the C ptr with the offset address of the PKA RAM location
          * where the x, y will be stored. */
@@ -182,7 +218,7 @@ private:
         }
 
         /* Determine the offset for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Write elliptic curve point.y co-ordinate value. */
         for(i = 0; i < Curve::size; i++) {
@@ -190,7 +226,7 @@ private:
         }
 
         /* Determine the offset for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Update the result location. */
         result_vector = PKA_RAM_BASE + offset;
@@ -208,15 +244,10 @@ private:
         return PKA_STATUS_SUCCESS;
     }
 
-    tPKAStatus ecc_mul_result(uint32_t result_vector) {
-        int i;
-        uint32_t addr;
-        uint32_t regMSWVal;
-        uint32_t len;
-
+    PKAStatus ecc_mul_result(uint32_t result_vector) {
         /* Check for the arguments. */
-        //assert(result_vector > PKA_RAM_BASE);
-        //assert(result_vector < (PKA_RAM_BASE + PKA_RAM_SIZE));
+        assert(result_vector > PKA_RAM_BASE);
+        assert(result_vector < (PKA_RAM_BASE + PKA_RAM_SIZE));
 
         /* Verify that the operation is completed. */
         if((HWREG(PKA_FUNCTION) & PKA_FUNCTION_RUN) != 0) {
@@ -225,7 +256,7 @@ private:
 
         if(HWREG(PKA_SHIFT) == 0x00000000) {
             /* Get the MSW register value. */
-            regMSWVal = HWREG(PKA_MSW);
+            uint32_t regMSWVal = HWREG(PKA_MSW);
 
             /* Check to make sure that the result vector is not all zeroes. */
             if(regMSWVal & PKA_MSW_RESULT_IS_ZERO) {
@@ -233,21 +264,20 @@ private:
             }
 
             /* Get the length of the result */
-            len = ((regMSWVal & PKA_MSW_MSW_ADDRESS_M) + 1)
+            uint32_t len = ((regMSWVal & PKA_MSW_MSW_ADDRESS_M) + 1)
                 - ((result_vector - PKA_RAM_BASE) >> 2);
-
-            addr = result_vector;
 
             /* copy the x co-ordinate value of the result from vector D into
              * the \e ec_point. */
+            uint32_t addr = result_vector;
+            uint8_t i;
             for(i = 0; i < len; i++) {
                 this->x[i] = HWREG(addr + 4 * i);
             }
 
-            addr += 4 * (i + 2 + len % 2);
-
             /* copy the y co-ordinate value of the result from vector D into
              * the \e ec_point. */
+            addr += 4 * (i + 2 + len % 2);
             for(i = 0; i < len; i++) {
                 this->y[i] = HWREG(addr + 4 * i);
             }
@@ -258,20 +288,15 @@ private:
         }
     }
 
-    tPKAStatus ecc_add_start(const ECPoint& p, uint32_t& result_vector) {
-        uint8_t extraBuf;
-        uint32_t offset;
-        int i;
-
-        offset = 0;
+    PKAStatus ecc_add_start(const ECPoint& p, uint32_t& result_vector) {
+        /* Calculate the extra buffer requirement. */
+        uint8_t extra_buf_size = 2 + Curve::size % 2, i;
+        uint32_t offset = 0;
 
         /* Make sure no operation is in progress. */
         if((HWREG(PKA_FUNCTION) & PKA_FUNCTION_RUN) != 0) {
             return PKA_STATUS_OPERATION_INPRG;
         }
-
-        /* Calculate the extra buffer requirement. */
-        extraBuf = 2 + Curve::size % 2;
 
         /* Update the A ptr with the offset address of the PKA RAM location
          * where the first ecPt will be stored. */
@@ -283,7 +308,7 @@ private:
         }
 
         /* Determine the offset in PKA RAM for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Load the y co-ordinate value of the first EC point in PKA RAM. */
         for(i = 0; i < Curve::size; i++) {
@@ -291,7 +316,7 @@ private:
         }
 
         /* Determine the offset in PKA RAM for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Update the B ptr with the offset address of the PKA RAM location
          * where the curve parameters will be stored. */
@@ -303,7 +328,7 @@ private:
         }
 
         /* Determine the offset in PKA RAM for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Write curve parameter 'a'. */
         for(i = 0; i < Curve::size; i++) {
@@ -311,7 +336,7 @@ private:
         }
 
         /* Determine the offset in PKA RAM for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Update the C ptr with the offset address of the PKA RAM location
          * where the ecPt2 will be stored. */
@@ -323,7 +348,7 @@ private:
         }
 
         /* Determine the offset in PKA RAM for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Load the y co-ordinate value of the second EC point in PKA RAM. */
         for(i = 0; i < Curve::size; i++) {
@@ -331,7 +356,7 @@ private:
         }
 
         /* Determine the offset in PKA RAM for the next data. */
-        offset += 4 * (i + extraBuf);
+        offset += 4 * (i + extra_buf_size);
 
         /* Copy the result vector location. */
         result_vector = PKA_RAM_BASE + offset;
@@ -348,15 +373,10 @@ private:
         return PKA_STATUS_SUCCESS;
     }
 
-    tPKAStatus ecc_add_result(ECPoint& result, uint32_t result_vector) {
-        uint32_t regMSWVal;
-        uint32_t addr;
-        int i;
-        uint32_t len;
-
+    PKAStatus ecc_add_result(ECPoint& result, uint32_t result_vector) {
         /* Check for the arguments. */
-        //ASSERT(result_vector > PKA_RAM_BASE);
-        //ASSERT(result_vector < (PKA_RAM_BASE + PKA_RAM_SIZE));
+        assert(result_vector > PKA_RAM_BASE);
+        assert(result_vector < (PKA_RAM_BASE + PKA_RAM_SIZE));
 
         if((HWREG(PKA_FUNCTION) & PKA_FUNCTION_RUN) != 0) {
             return PKA_STATUS_OPERATION_INPRG;
@@ -364,7 +384,7 @@ private:
 
         if(HWREG(PKA_SHIFT) == 0x00000000) {
             /* Get the MSW register value. */
-            regMSWVal = HWREG(PKA_MSW);
+            uint32_t regMSWVal = HWREG(PKA_MSW);
 
             /* Check to make sure that the result vector is not all zeroes. */
             if(regMSWVal & PKA_MSW_RESULT_IS_ZERO) {
@@ -372,21 +392,20 @@ private:
             }
 
             /* Get the length of the result. */
-            len = ((regMSWVal & PKA_MSW_MSW_ADDRESS_M) + 1)
+            uint32_t len = ((regMSWVal & PKA_MSW_MSW_ADDRESS_M) + 1)
                 - ((result_vector - PKA_RAM_BASE) >> 2);
-
-            addr = result_vector;
 
             /* Copy the x co-ordinate value of result from vector D into the
              * the output EC Point. */
+            uint32_t addr = result_vector;
+            uint8_t i;
             for(i = 0; i < len; i++) {
                 result.x[i] = HWREG(addr + 4 * i);
             }
 
-            addr += 4 * (i + 2 + len % 2);
-
             /* Copy the y co-ordinate value of result from vector D into the
              * the output EC Point. */
+            addr += 4 * (i + 2 + len % 2);
             for(i = 0; i < len; i++) {
                 result.y[i] = HWREG(addr + 4 * i);
             }
@@ -397,8 +416,8 @@ private:
         }
     }
 
-    uint32_t *x;
-    uint32_t *y;
+    uint32_t x[Curve::size];
+    uint32_t y[Curve::size];
 
 };
 
