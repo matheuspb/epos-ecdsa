@@ -148,7 +148,7 @@ public:
 	 * B_Len ≤ Max_len
 	 *
 	 */
-	HWBignum operator+(const HWBignum &b) {
+	HWBignum operator+(const HWBignum &b) const {
 		// Add operation with both numbers positiv
 		if(_signal == b._signal) {
 			HWBignum result;
@@ -199,7 +199,7 @@ public:
 	 * Result must be positive (A ≥ B)
 	 *
 	 */
-	HWBignum operator-(const HWBignum &b) {
+	HWBignum operator-(const HWBignum &b) const {
 		uint32_t res_addr = 0;
 		tPKAStatus opStatus = 0;
 
@@ -255,7 +255,7 @@ public:
 	 * B_Len ≤ Max_len
 	 *
 	 */
-	HWBignum operator*(const HWBignum &b)__attribute__((noinline)) {
+	HWBignum operator*(const HWBignum &b) const __attribute__((noinline)) {
 		if(*this == HWBignum::zero) return HWBignum(0);
 
 		int res_size = _len + b._len + 6;
@@ -532,9 +532,8 @@ public:
 	 * The Highest word of the Modulus vector may not be zero
 	 *
 	 */
-	HWBignum inv_mod(HWBignum& b) {
-
-		HWBignum d_old = HWBignum::zero;
+	HWBignum inv_mod(HWBignum& b) const {
+		/*HWBignum d_old = HWBignum::zero;
 		HWBignum d_new = HWBignum::one;
 		HWBignum r_new = *this;
 		HWBignum r_old = b;
@@ -559,7 +558,17 @@ public:
 		if(r_old == HWBignum::one) {
 			return d_old % b;
 		}
-		return HWBignum(0);
+		return HWBignum(0);*/
+        HWBignum result = HWBignum(0x0, b._len*4);
+        uint32_t res_addr = 0;
+        inv_mod_start(_data, _len, b._data, b._len, &res_addr);
+
+        tPKAStatus opStatus = 0;
+        do {
+            opStatus = inv_mod_result(result._data, (uint32_t*) &result._len, res_addr);
+        } while (opStatus == PKA_STATUS_OPERATION_INPRG);
+
+        return result;
 	}
 
 	/*************************************************************
@@ -627,11 +636,10 @@ public:
     bool is_even() { return !(_data[0] % 2); }
 
     friend OStream &operator<<(OStream & out, const HWBignum & b){
-        unsigned int i;
         out << '[';
-        for(i=0;i<4;i++) {
-            out << (unsigned int)b._data[i];
-            if(i < 4-1)
+        for(unsigned int i = 0; i < b._len; i++) {
+            out << (uint32_t) b._data[i];
+            if(i < b._len - 1)
                 out << ", ";
         }
         out << "]";
@@ -639,11 +647,10 @@ public:
     }
 
     friend Debug &operator<<(Debug & out, const HWBignum & b) {
-        unsigned int i;
         out << '[';
-        for(i = 0; i < 4; i++) {
-            out << (unsigned int)b._data[i];
-            if(i < 4 - 1)
+        for(unsigned int i = 0; i < b._len; i++) {
+            out << (uint32_t) b._data[i];
+            if(i < b._len - 1)
                 out << ", ";
         }
         out << "]";

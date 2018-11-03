@@ -89,12 +89,16 @@ const uint32_t SecP256k1Info::y[] = {
     0xFD17B448, 0xA6855419, 0x9C47D08F, 0xFB10D4B8 };
 
 
-template<typename Curve>
+template <typename> class ECDSA;
+
+template <typename Curve>
 class ECPoint {
 
-public:
+    template<typename> friend class ECDSA;
     typedef uint8_t PKAStatus;
     typedef HWBignum Scalar;
+
+public:
 
     ECPoint() {
         memcpy(x, Curve::x, Curve::size * sizeof(*Curve::x));
@@ -420,6 +424,74 @@ private:
     uint32_t y[Curve::size];
 
 };
+
+template<typename Curve>
+class ECDSA {
+
+    typedef ECPoint<Curve> Point;
+    typedef HWBignum Scalar;
+    static const uint32_t zero[Curve::size];
+
+public:
+
+    struct Signature {
+        Signature(const Scalar& _r, const Scalar& _s): r(_r), s(_s) {}
+        Scalar r;
+        Scalar s;
+    };
+
+    ECDSA():
+        d(zero, Curve::size*4),
+        n(Curve::n, Curve::size*4)
+    {}
+
+    void gen_key_pair() {
+        d.random_same_size();
+        q *= d;
+    }
+
+    Signature sign(const Scalar& z) {
+        Scalar k(zero, Curve::size*4);
+        k.random_same_size();
+        k = k % n;
+
+        Point g;
+        g *= k;
+        Scalar x_1(g.x, Curve::size*4);
+
+        Scalar r = x_1 % n;
+        Scalar s = (k.inv_mod(n) * (z + r*d)) % n;
+
+        return Signature(r, s);
+    }
+
+    bool verify(const Scalar& z, const Signature& sig) {
+        Scalar w = sig.s.inv_mod(n);
+
+        Scalar u_1 = (z*w) % n;
+        Scalar u_2 = (sig.r*w) % n;
+
+        Point g;
+        g *= u_1;
+        Point q_1(q);
+        q_1 *= u_2;
+
+        Point result = g + q_1;
+        Scalar x_1(result.x, Curve::size*4);
+        x_1 = x_1 % n;
+
+        return Scalar::cmp(&x_1, &(sig.r)) == 0;
+    }
+
+private:
+
+    Scalar d;  // Private key
+    Point  q;  // Public key
+    Scalar n;  // Order of the curve generator
+
+};
+
+template <typename Curve> const uint32_t ECDSA<Curve>::zero[Curve::size] = {0};
 
 __END_UTIL
 

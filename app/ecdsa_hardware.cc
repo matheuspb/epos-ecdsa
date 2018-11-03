@@ -6,15 +6,17 @@
 using namespace EPOS;
 
 OStream cout;
-typedef ECPoint<SecP256k1Info> Point;
+typedef SecP256Info Curve;
+typedef ECPoint<Curve> Point;
+typedef ECDSA<Curve> DSA;
 
 int main()
 {
     cout << "========== BEGIN ECDSA TESTING ==========" << endl;
     Point a, b;
 
-    HWBignum d_a(new uint32_t[8], 8);
-    HWBignum d_b(new uint32_t[8], 8);
+    HWBignum d_a(new uint32_t[Curve::size], Curve::size*4);
+    HWBignum d_b(new uint32_t[Curve::size], Curve::size*4);
 
     d_a.random_same_size();
     d_b.random_same_size();
@@ -35,6 +37,13 @@ int main()
     cout << "Copy constructor testing: ";
     Point c(a);
     test = a == c;
+    cout << (test ? "OK" : "FAIL") << endl;
+
+    cout << "ECDSA testing: ";
+    DSA dsa;
+    dsa.gen_key_pair();
+    DSA::Signature s = dsa.sign(d_a);
+    test = dsa.verify(d_a, s);
     cout << (test ? "OK" : "FAIL") << endl;
 
     cout << "=========== END ECDSA TESTING ===========" << endl;
