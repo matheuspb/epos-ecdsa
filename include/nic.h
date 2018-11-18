@@ -156,26 +156,23 @@ public:
     struct Metadata
     {
     	// TODO: remove unnecessary long longs
-        int rssi;                             // Received Signal Strength Indicator
-        unsigned long long sfd_time_stamp;    // Start-of-frame reception time stamp
-        unsigned int id;                      // Message identifier
-        bool id_seen_before;                  // If true, the message's id was seen recently
-        unsigned long long offset;            // MAC contention offset
-        bool destined_to_me;                  // Whether this node is inside the destination region for this message
-        bool ack;                             // Whether this message is being transmitted as an acknowledgment
-        bool downlink;                        // Message direction (downlink == from sink to sensor)
-        unsigned long long deadline;          // Time until when this message must arrive at the final destination
-        unsigned int my_distance;             // This node's distance to the message's final destination
-        unsigned int sender_distance;         // Last hop's distance to the message's final destination
-        bool is_new;                          // Whether this message was just created by this node
-        bool is_microframe;                   // Whether this message is a Microframe
-        bool relevant;                        // Whether any component is interested in this message
-        bool trusted;                         // If true, this message was successfully verified by the Security Manager
-        bool freed;                           // If true, the MAC will not free this buffer
-        unsigned int random_backoff_exponent; // Exponential backoff used by the MAC to avoid permanent interference
-        unsigned int microframe_count;        // Number of Microframes left until data
-        int hint;                             // Inserted in the Hint Microframe field
-        unsigned char progress_bits;          // Bitmap for sinks towards which this node makes progress
+    	int rssi;                             // Received Signal Strength Indicator
+    	unsigned long long sfd_time_stamp;    // Start-of-frame reception time stamp
+    	unsigned int id;                      // Message identifier
+    	unsigned long long offset;            // MAC contention offset
+    	bool destined_to_me;                  // Whether this node is the final destination for this message
+    	bool downlink;                        // Message direction (downlink == from sink to sensor)
+    	unsigned long long deadline;          // Time until when this message must arrive at the final destination
+    	unsigned int my_distance;             // This node's distance to the message's final destination
+    	unsigned int sender_distance;         // Last hop's distance to the message's final destination
+    	bool is_new;                          // Whether this message was just created by this node
+    	bool is_microframe;                   // Whether this message is a Microframe
+    	bool relevant;                        // Whether any component is interested in this message
+    	bool trusted;                         // If true, this message was successfully verified by the Security Manager
+    	bool freed;                           // If true, the MAC will not free this buffer
+    	unsigned int random_backoff_exponent; // Exponential backoff used by the MAC to avoid permanent interference
+    	unsigned int microframe_count;        // Number of Microframes left until data
+    	int hint;                             // Inserted in the Hint Microframe field
         unsigned int times_txed;              // Number of times the MAC transmited this buffer
     };
 

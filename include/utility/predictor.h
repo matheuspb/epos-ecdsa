@@ -10,9 +10,9 @@ class Model_Common
 public:
     // Model Types
     enum Type {
-        NONE       = 0,
-        CONSTANT   = 1,
-        LINEAR     = 2,
+        NONE     = 0,
+        CONSTANT = 1,
+        LINEAR   = 2,
         S_CONSTANT = 3,
         S_LINEAR   = 4,
     };
@@ -166,11 +166,10 @@ class Dummy_Predictor : public Predictor_Common
 public:
     static const unsigned int TYPE = Predictor_Common::NONE;
     typedef Dummy_Model<> Model;
-    struct Configuration { friend OStream & operator<<(OStream & os, const Configuration & c) { return os; } };
+    struct Configuration {};
     template<typename S>
     Dummy_Predictor(S * data, Configuration c, bool r) : Predictor_Common(TYPE) {}
     template<typename T> int predict(const T & time) const { return 0; }
-    template<typename S, typename T, typename ...O> void predict(S * data, const T & t, const O & ...o) const {}
     template<typename C> void configure(const C & conf) { }
     template<typename T, typename V> bool trickle(const T & t, const V & v) { assert(false); return false; }
     Model & model() const { assert(false); return *_model; }
@@ -188,36 +187,9 @@ class Last_Value_Predictor : public Predictor_Common
 public:
     static const unsigned int TYPE = Predictor_Common::LAST_VALUE;
     typedef Constant_Model<Time, Value> Model;
-
-    struct Configuration
-    {
-        Configuration(Value _r=0, Value _a=0, Time _t=0) : r(_r), a(_a), t(_t) {
-            OStream cout;
-            cout << "New Configuration: r="<<_r<<", a="<<_a<<", t="<<_t<< endl;
-        }
-
-        template<typename Config>
-        Configuration(const Config & conf) : Configuration(conf.r, conf.a, conf.t) {}
-
-        friend OStream & operator<<(OStream & os, const Configuration & c) {
-            os << "{r="<<c.r<<",a="<<c.a<<",t="<<c.t<<"}";
-            return os;
-        }
-
-        Value r;
-        Value a;
-        Time t;
-    } __attribute__((packed));
-
-    Last_Value_Predictor(Value r=0, Value a=0, Time t=0) : Predictor_Common(TYPE), _rel_err(r), _abs_err(a), _t_err(t), _model(0), _miss_predicted(0) {
-        OStream cout;
-        cout << "New Last_Value 1: r="<<r<<", a="<<a<<", t=" << t << endl;
-    }
-
-    Last_Value_Predictor(S * data, const Configuration & config, bool remote=false) : Predictor_Common(TYPE), _rel_err(config.r), _abs_err(config.a), _t_err(config.t), _model(0), _miss_predicted(0) {
-        OStream cout;
-        cout << "New Last_Value 2: r="<<config.r<<", a="<<config.a<<", t=" << config.t << endl;
-    }
+    struct Configuration {};
+    Last_Value_Predictor() : Predictor_Common(TYPE), _model(0) {}
+    Last_Value_Predictor(S * data, Configuration c, bool remote=false) : Predictor_Common(TYPE), _model(0) {}
 
     template<typename ...O>
     Value predict(const Time & t, const O & ...o) const {
@@ -227,39 +199,17 @@ public:
             return 0;
     }
 
-    template<typename ...O>
-    void predict(S * data, const Time & t, const O & ...o) const {
-        data->_time = t;
-        data->_value = predict(t);
-    }
-
     bool trickle(const Time & time, const Value & value) {
         if(!_model) {
             _model = new Model();
             _model->v(value);
             return false;
         } else {
-            float predicted = predict(time);
-            OStream cout;
-            float max_acceptable_error = max( abso(((float)value * (float)_rel_err)/100.0f), (float)_abs_err );
-            float error = abso( (float)value - predicted );
-            cout << "real:" << value << "  pred:" << predicted << "  err:" << error << "  max:" << max_acceptable_error << " t_err:"<< _t_err << " miss:" << _miss_predicted << endl;
-
-            if(error > max_acceptable_error){
-                if(++_miss_predicted > _t_err){
-                    _model->v(value);
-                    _miss_predicted = 0;
-                    return false;
-                }
-            } else {
-                _miss_predicted = 0;
+            Value predicted = (*_model)(time);
+            if(predicted != value){
+                _model->v(value);
+                return false;
             }
-
-//            Value predicted = (*_model)(time);
-//            if(predicted != value){
-//                _model->v(value);
-//                return false;
-//            }
         }
         return true;
     }
@@ -273,28 +223,11 @@ public:
     }
     void update(const Model & m, const bool & from_sink) { model(m); }
 
-    void configure(const Configuration & config) {
-        _rel_err = config.r;
-        _abs_err = config.a;
-        _t_err = config.t;
-    }
-
+    //TODO
+    template<typename C>
+    void configure(const C & conf) {  }
 private:
-    template<typename T>
-    T abso(const T & a){ return (a < 0) ? -a : a; }
-
-    template<typename T>
-    const T & max(const T & a, const T & b) { return (a >= b) ? a : b; }
-
-    template<typename T>
-    const T & min(const T & a, const T & b) { return (a <= b) ? a : b; }
-
-private:
-    Value _rel_err;
-    Value _abs_err;
-    Time _t_err;
     Model * _model;
-    unsigned int _miss_predicted;
 };
 
 template<typename E, unsigned int W=10>
@@ -375,26 +308,20 @@ public:
     template<unsigned int _W, unsigned int _L, int _R=0, int _A=0 , Time _T=0>
     struct Configuration
     {
-        //W, // window size
-        //L, // number of edge points to calculate the coefficients.
-        //R, // relative tolerance
-        //A, // absolute tolerance
-        //T, // time tolerance
+        enum Parameters {
+            W = _W, // window size
+            L = _L, // number of edge points to calculate the coefficients.
+            R = _R, // relative tolerance
+            A = _A, // absolute tolerance
+            T = _T, // time tolerance
+        };
 
-        Configuration(Value _r=_R, Value _a=_A, Time _t=_T, unsigned int _w=_W, unsigned int _l=_L) : w(_w), l(_l), r(_r), a(_a), t(_t) {
-            OStream cout;
-            cout << "New Configuration: w="<<_w<<", l="<<_l<<", r="<<_r<<", a="<<_a<<", t="<<_t<< endl;
-        }
+        Configuration(unsigned int _w, unsigned int _l, Value _r, Value _a, Time _t) : w(_w), l(_l), r(_r), a(_a), t(_t) {}
 
         template<typename Config>
-        Configuration(const Config & conf) : Configuration(conf.r, conf.a, conf.t, conf.w, conf.l) {}
+        Configuration(const Config & conf) : Configuration(conf.w, conf.l, conf.r, conf.a, conf.t) {}
 
-        //Configuration() : Configuration(_W, _L, _R, _A, _T) {}
-
-        friend OStream & operator<<(OStream & os, const Configuration & c) {
-            os << "{w="<<c.w<<",l="<<c.l<<",r="<<c.r<<",a="<<c.a<<",t="<<c.t<<"}";
-            return os;
-        }
+        Configuration() : Configuration(_W, _L, _R, _A, _T) {}
 
         unsigned int w;
         unsigned int l;
@@ -404,16 +331,10 @@ public:
     } __attribute__((packed));
 
 public:
-    DBP(unsigned int w, unsigned int l, Value r=0, Value a=0, Time t=0) : Base(TYPE, w), _l(l), _rel_err(r), _abs_err(a), _t_err(t), _model(0), _miss_predicted(0) {
-        OStream cout;
-        cout << "New DBP 1: w="<<w<<", l="<<l<<", r="<<r<<", a="<<a<<", t=" << t << endl;
-    }
+    DBP(unsigned int w, unsigned int l, Value _r=0, Value _a=0, Time _t=0) : Base(TYPE, w), _l(l), _rel_err(_r), _abs_err(_a), _t_err(_t), _model(0) { }
 
     template<typename Config>
-    DBP(S * data, const Config & config, bool remote=false) : Base(TYPE, config.w), _l(config.l), _rel_err(config.r), _abs_err(config.a), _t_err(config.t), _model(0), _miss_predicted(0) {
-        OStream cout;
-        cout << "New DBP 2: w="<<config.w<<", l="<<config.l<<", r="<<config.r<<", a="<<config.a<<", t=" << config.t << endl;
-    }
+    DBP(S * data, const Config & config, bool remote=false) : Base(TYPE, config.w), _l(config.l), _rel_err(config.r), _abs_err(config.a), _t_err(config.t), _model(0) { }
 
     template<typename ...O>
     Value predict(const Time & t, const O & ...o) const {
@@ -423,12 +344,6 @@ public:
             return (Value)history->tail().value();
         else
             return 0;
-    }
-
-    template<typename ...O>
-    void predict(S * data, const Time & t, const O & ...o) const {
-        data->_time = t;
-        data->_value = predict(t);
     }
 
     void update(const Time & t, const Value & v) { store(t, v); }
@@ -443,19 +358,12 @@ public:
             }
         } else {
             float predicted = predict(time);
-            OStream cout;
-            float max_acceptable_error = max( abso(((float)value * (float)_rel_err)/100.0f), (float)_abs_err );
+            float max_acceptable_error = max( abso(((float)value * (float)_rel_err)/100), (float)_abs_err );
             float error = abso( (float)value - predicted );
-            cout << "real:" << value << "  pred:" << predicted << "  err:" << error << "  max:" << max_acceptable_error << " t_err:"<< _t_err << " miss:" << _miss_predicted << endl;
 
             if(error > max_acceptable_error){
-                if(++_miss_predicted > _t_err){
-                    build_model(time, value);
-                    _miss_predicted = 0;
-                    return false;
-                }
-            } else {
-                _miss_predicted = 0;
+                build_model(time, value);
+                return false;
             }
         }
 
@@ -470,13 +378,9 @@ public:
     }
     void update(const Model & m, const bool & from_sink) { model(m); }
 
+    //TODO
     template<typename C>
-    void configure(const C & config) {
-        _l = config.l;
-        _rel_err = config.r;
-        _abs_err = config.a;
-        _t_err = config.t;
-    }
+    void configure(const C & conf) {  }
 
 private:
     template<typename T>
@@ -526,7 +430,6 @@ private:
     Value _abs_err;
     Time _t_err;
     Model * _model;
-    unsigned int _miss_predicted;
 };
 
 __END_UTIL

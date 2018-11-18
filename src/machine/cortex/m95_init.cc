@@ -11,7 +11,7 @@ __BEGIN_SYS
 
 M95::M95(unsigned int unit): _unit(unit), _http_data_mode(false), _last_send(0)
 {
-    db<M95>(WRN) << "M95(unit=" << unit << ") => " << this << endl;
+    db<M95>(TRC) << "M95(unit=" << unit << ") => " << this << endl;
 
     _uart = new (SYSTEM) UART(Traits<M95>::UART_UNIT, Traits<M95>::UART_BAUD_RATE, Traits<M95>::UART_DATA_BITS, Traits<M95>::UART_PARITY, Traits<M95>::UART_STOP_BITS);
 
@@ -42,7 +42,7 @@ void M95::check_timeout()
 
 void M95::on()
 {
-    db<M95>(WRN) << "M95::on()" << endl;
+    db<M95>(TRC) << "M95::on()" << endl;
 
     _init_timeout = TSC::time_stamp() + 150000000ull * (TSC::frequency() / 1000000);
 
@@ -51,7 +51,7 @@ void M95::on()
         return;
     }
 
-    db<M95>(WRN) << "M95::on(): powering up" << endl;
+    db<M95>(TRC) << "M95::on(): powering up" << endl;
 
     // Leave pwrkey up until status is stable at 1.
     _pwrkey->set();
@@ -74,7 +74,7 @@ void M95::on()
         send_command(cmd, strlen(cmd));
     } while(!wait_response("ATE0\r\r\nOK\r\n",300000));
 
-    db<M95>(WRN) << "M95::on(): checking SIM card" << endl;
+    db<M95>(TRC) << "M95::on(): checking SIM card" << endl;
     // Check SIM card
     do {
         check_timeout();
@@ -82,7 +82,7 @@ void M95::on()
         send_command(cmd, strlen(cmd));
     } while(!wait_response("+CPIN: READY\r\n\r\nOK\r\n",5000000));
 
-    db<M95>(WRN) << "M95::on(): waiting for network registration" << endl;
+    db<M95>(TRC) << "M95::on(): waiting for network registration" << endl;
     // Check Network registration
     do {
         check_timeout();
@@ -145,7 +145,6 @@ void M95::on()
     // Activate GPRS
     do {
         check_timeout();
-        Machine::delay(1000000);
         const char cmd[] = "AT+QIACT";
         send_command(cmd, strlen(cmd));
     } while(!wait_response("OK\r\n",150000000));// {
@@ -196,12 +195,12 @@ void M95::off()
         return;
     }
 
-    db<M95>(WRN) << "M95::off(): deactivating GPRS" << endl;
+    db<M95>(TRC) << "M95::off(): deactivating GPRS" << endl;
     const char cmd[] = "AT+QIDEACT";
     send_command(cmd, strlen(cmd));
     wait_response("DEACT OK\r\n",40000000);
 
-    db<M95>(WRN) << "M95::off(): powering down..." << endl;
+    db<M95>(TRC) << "M95::off(): powering down..." << endl;
 
     // A 1-second pulse is what the manual says is fine for
     // turning off the device (Hardware Manual, 3.4.2.1)
@@ -214,12 +213,12 @@ void M95::off()
     _http_data_mode = false;
     _last_send = 0;
 
-    db<M95>(WRN) << "...done!" << endl;
+    db<M95>(TRC) << "...done!" << endl;
 }
 
 void M95::init(unsigned int unit)
 {
-    db<Init, M95>(WRN) << "M95::init(unit=" << unit << ")" << endl;
+    db<Init, M95>(TRC) << "M95::init(unit=" << unit << ")" << endl;
 
     // Initialize the device
     M95 * dev = new (SYSTEM) M95(unit);

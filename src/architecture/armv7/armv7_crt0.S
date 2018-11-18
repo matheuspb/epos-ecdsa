@@ -1,14 +1,11 @@
-// EPOS ARMv7 Program Starter
 
         .file "armv7_crt0.S"
 
-        // Entry point
         .section .text
         .align  2
         .global _start
         .type   _start, function
 _start:
-        // Clear BSS
         eor     r0, r0
         ldr     r1, =__bss_start__
         ldr     r2, =__bss_end__
@@ -25,6 +22,6 @@ _start:
 __epos_app_entry:
         bl      __pre_main
         bl      main
-        push    {r0}         // save main's return value to be used by exit()
+        push    {r0}
         bl      _fini
         bl      _exit

@@ -16,52 +16,6 @@ public:
     typedef _UTIL::Observed Observed;
     typedef _UTIL::Observer Observer;
 
-public:
-    typedef TSTP::Unit Unit;
-
-    template<unsigned int S>
-    struct Digital_Value
-    {
-        template<typename T>
-        Digital_Value(T d) {
-            memset(_value, 0, S);
-            memcpy(_value, &d, (sizeof(T) > S) ? S : sizeof(T));
-        }
-
-        template<typename T>
-        Digital_Value & operator=(const T & v) {
-            memcpy(_value, &v, S);
-            return *this;
-        }
-
-        template<typename T>
-        operator T() {
-            return static_cast<T>(*_value);
-        }
-
-        template<typename T>
-        T * data() { return reinterpret_cast<T *>(_value); }
-
-        template<typename D> Digital_Value & operator+=(const D & d) { return *this; }
-        friend OStream & operator<<(OStream & os, const Digital_Value<S> & d) { return os; }
-
-    private:
-        unsigned char _value[S];
-    }__attribute__((packed));
-
-    template<unsigned int UNIT>
-    struct Get_Type
-    {
-        typedef typename IF<(UNIT & Unit::SI) && ((UNIT & Unit::NUM) == Unit::I32), long int,
-                typename IF<(UNIT & Unit::SI) && ((UNIT & Unit::NUM) == Unit::I64), long long int,
-                typename IF<(UNIT & Unit::SI) && ((UNIT & Unit::NUM) == Unit::F32), float,
-                typename IF<(UNIT & Unit::SI) && ((UNIT & Unit::NUM) == Unit::D64), double,
-                typename IF<!(UNIT & Unit::SI), Smart_Data_Common::Digital_Value<UNIT & Unit::LEN>, void>::Result>::Result>::Result>::Result>::Result Type;
-    };
-
-    template<typename T>
-    struct Get_NUM;
-
     struct DB_Series {
         unsigned char version;
         unsigned long unit;
@@ -90,10 +44,7 @@ public:
         unsigned long long t;
         unsigned long dev;
         friend OStream & operator<<(OStream & os, const SI_Record & d) {
-            unsigned long long ll = *const_cast<unsigned long long*>(reinterpret_cast<const unsigned long long*>(&d.value));
-            ll = ((ll&0xFFFFFFFF)<<32) + (ll>>32);
-            double val_to_print = *reinterpret_cast<double*>(&ll);
-            os << "{ve=" << d.version << ",u=" << d.unit << ",va=" << val_to_print << ",e=" << d.error << ",src=(" << d.x << "," << d.y << "," << d.z << "),t=" << d.t << ",d=" << d.dev << "}";
+            os << "{ve=" << d.version << ",u=" << d.unit << ",va=" << d.value << ",e=" << d.error << ",src=(" << d.x << "," << d.y << "," << d.z << "),t=" << d.t << ",d=" << d.dev << "}";
             return os;
         }
     }__attribute__((packed));
@@ -117,11 +68,6 @@ public:
     }__attribute__((packed));
 };
 
-template<> struct Smart_Data_Common::Get_NUM<long>      { enum { NUM = TSTP::Unit::I32 }; };
-template<> struct Smart_Data_Common::Get_NUM<long long> { enum { NUM = TSTP::Unit::I64 }; };
-template<> struct Smart_Data_Common::Get_NUM<float>     { enum { NUM = TSTP::Unit::F32 }; };
-template<> struct Smart_Data_Common::Get_NUM<double>    { enum { NUM = TSTP::Unit::D64 }; };
-
 template <typename T>
 struct Smart_Data_Type_Wrapper
 {
@@ -142,12 +88,15 @@ private:
     typedef typename TSTP::Interested Interested;
 
     typedef typename TSTP::Predictive Predictive;
+    typedef typename Transducer::Predictor Predictor;
+    typedef typename Transducer::Predictor_Configuration Predictor_Configuration;
+
 public:
     static const unsigned int UNIT = Transducer::UNIT;
+    static const unsigned int NUM = Transducer::NUM;
     static const unsigned int ERROR = Transducer::ERROR;
-
-    typedef typename Get_Type<UNIT>::Type Value;
-    typedef typename IF<(UNIT & Unit::SI), SI_Record, Digital_Record<UNIT & Unit::LEN>>::Result DB_Record;
+    typedef typename TSTP::Unit::Get<NUM>::Type Value;
+    typedef typename IF<(Transducer::UNIT >> 31) == 1, SI_Record, Digital_Record<Transducer::UNIT & 0xFFFF>>::Result DB_Record;
 
     enum {
         STATIC_VERSION = (1 << 4) + (1 << 0),
@@ -163,24 +112,21 @@ public:
         PREDICTIVE = (1 << 4)
     };
 
+    static const unsigned int REMOTE = -1;
+
     typedef RTC::Microsecond Microsecond;
 
+    typedef TSTP::Unit Unit;
     typedef TSTP::Error Error;
     typedef TSTP::Coordinates Coordinates;
     typedef TSTP::Region Region;
     typedef TSTP::Time Time;
     typedef TSTP::Time_Offset Time_Offset;
 
-    typedef typename Transducer::Predictor Predictor;
-    struct Predictor_Configuration : public Transducer::Predictor_Configuration{
-        template<typename ...O>
-        Predictor_Configuration(const O & ...o) : Transducer::Predictor_Configuration(o...) {}
-    };
-
 public:
     // Local data source, possibly advertised to or commanded by the network
-    Smart_Data(unsigned int dev, const Microsecond & expiry, const unsigned char & mode = PRIVATE, const Microsecond & period = 0)
-    : _unit(UNIT), _value(0), _error(ERROR), _coordinates(TSTP::here()), _time(TSTP::now()), _expiry(expiry), _remote(false), _device(dev), _mode(mode), _thread(0), _interested(0), _responsive(((mode & ADVERTISED) == ADVERTISED) ? new Responsive(this, UNIT, ERROR, expiry, dev, ((mode & DISPLAYED) == DISPLAYED)) : 0), _predictor(0) {
+    Smart_Data(unsigned int dev, const Microsecond & expiry, const unsigned char & mode = PRIVATE)
+    : _unit(UNIT), _value(0), _error(ERROR), _coordinates(TSTP::here()), _time(TSTP::now()), _expiry(expiry), _device(dev), _mode(mode), _thread(0), _interested(0), _responsive(((mode & ADVERTISED) == ADVERTISED) ? new Responsive(this, UNIT, ERROR, expiry, ((mode & DISPLAYED) == DISPLAYED)) : 0), _predictor(0) {
         db<Smart_Data>(TRC) << "Smart_Data(dev=" << dev << ",exp=" << expiry << ",mode=" << mode << ")" << endl;
         if(Transducer::POLLING)
             Transducer::sense(_device, this);
@@ -188,15 +134,13 @@ public:
             Transducer::attach(this);
         if(_responsive)
             TSTP::attach(this, _responsive);
-        if((mode & ADVERTISED) != ADVERTISED && (period > 0))
-            _thread = new Periodic_Thread(period, &updater, _device, static_cast<Time_Offset>(expiry), this);
         db<Smart_Data>(INF) << "Smart_Data(dev=" << dev << ",exp=" << expiry << ",mode=" << mode << ") => " << *this << endl;
     }
     // Remote, event-driven (period = 0) or time-triggered data source
-    Smart_Data(const Region & region, const Microsecond & expiry, const Microsecond & period = 0, const unsigned char & mode = PRIVATE, Predictor_Configuration predictor_config = Predictor_Configuration())
-    : _unit(UNIT), _value(0), _error(ERROR), _coordinates(0), _time(0), _expiry(expiry), _remote(true), _device(0), _mode(static_cast<Mode>(mode & (~COMMANDED))), _thread(0), _responsive(0), _predictor(((Predictor_Common::Type)Predictor::TYPE != Predictor_Common::NONE) ? new Predictor(this, predictor_config, _remote==_remote) : 0)
+    Smart_Data(const Region & region, const Microsecond & expiry, const Microsecond & period = 0, const unsigned char & mode = PRIVATE)
+    : _unit(UNIT), _value(0), _error(ERROR), _coordinates(0), _time(0), _expiry(expiry), _device(REMOTE), _mode(static_cast<Mode>(mode & (~COMMANDED))), _thread(0), _responsive(0), _predictor(((Predictor_Common::Type)Predictor::TYPE != Predictor_Common::NONE) ? new Predictor(this, Predictor_Configuration(), REMOTE==REMOTE) : 0)
     {
-        _interested = new Interested(this, region, UNIT, TSTP::SINGLE, 0, expiry, period, (((mode & PREDICTIVE) == PREDICTIVE) ? (Predictor_Common::Type)Predictor::TYPE : Predictor_Common::NONE), predictor_config);
+        _interested = new Interested(this, region, UNIT, TSTP::SINGLE, 0, expiry, period, (((mode & PREDICTIVE) == PREDICTIVE) ? (Predictor_Common::Type)Predictor::TYPE : Predictor_Common::NONE), Predictor_Configuration());
         TSTP::attach(this, _interested);
     }
 
@@ -220,9 +164,7 @@ public:
 
         DB_Record ret;
         ret.version = STATIC_VERSION;
-        // NOTE: The IoT platform doesn't make differentiation for NUM in SI Units. For example, Temperature is always the same Unit,
-        // even if it's from different Transducers, with different values of NUM (I32, I64, F32, D64).
-        ret.unit = (IF_BOOL<UNIT & Unit::SI>::Result) ? static_cast<unsigned long>(_unit & (~Unit::NUM)) : static_cast<unsigned long>(_unit);
+        ret.unit = _unit;
         ret.x = c.x;
         ret.y = c.y;
         ret.z = c.z;
@@ -242,8 +184,8 @@ public:
                 si_record->value = *((double*)&ll);
             }
         } else {
-            assert(sizeof(Value) == (UNIT & Unit::LEN));
-            Digital_Record<UNIT & Unit::LEN> * digital_record = reinterpret_cast<Digital_Record<UNIT & Unit::LEN>*>(&ret);
+            assert(sizeof(Value) == Transducer::UNIT & 0xFFFF);
+            Digital_Record<Transducer::UNIT & 0xFFFF> * digital_record = reinterpret_cast<Digital_Record<Transducer::UNIT & 0xFFFF>*>(&ret);
             digital_record->error = 0;
             memcpy(&digital_record->value, &v, sizeof(Value));
         }
@@ -254,9 +196,7 @@ public:
         DB_Series ret;
 
         ret.version = STATIC_VERSION;
-        // NOTE: The IoT platform doesn't make differentiation for NUM in SI Units. For example, Temperature is always the same Unit,
-        // even if it's from different Transducers, with different values of NUM (I32, I64, F32, D64).
-        ret.unit = (IF_BOOL<UNIT & Unit::SI>::Result) ? static_cast<unsigned long>(_unit & (~Unit::NUM)) : static_cast<unsigned long>(_unit);
+        ret.unit = _unit;
 
         if(_interested) {
             TSTP::Global_Coordinates c = TSTP::absolute(_interested->region().center);
@@ -282,10 +222,10 @@ public:
 
     operator Value() {
         if(expired()) {
-            if(local() && (Transducer::POLLING)) { // Local data source
+            if((_device != REMOTE) && (Transducer::POLLING)) { // Local data source
                 Transducer::sense(_device, this); // read sensor
                 _time = TSTP::now();
-            } else if(remote() && ((_mode & PREDICTIVE) == PREDICTIVE)) {
+            } else if(_device == REMOTE && ((_mode & PREDICTIVE) == PREDICTIVE)) {
                 if(_predictor){
                     _time = TSTP::now();
                     _value = _predictor->predict(_time);
@@ -302,7 +242,7 @@ public:
     }
 
     Smart_Data & operator=(const Value & v) {
-        if(local())
+        if(_device != REMOTE)
             Transducer::actuate(_device, this, v);
         if(_interested)
             _interested->command(v);
@@ -317,21 +257,18 @@ public:
     }
 
     bool expired() const { return TSTP::now() > (_time + _expiry); }
-    bool remote() const { return _remote; }
-    bool local() const { return !remote(); }
 
     TSTP::Global_Coordinates location() const { return TSTP::absolute(_coordinates); }
     const Time time() const { return TSTP::absolute(_time); }
     const Error & error() const { return _error; }
     const Unit & unit() const { return _unit; }
-    const unsigned int & device() const { return _device; }
 
     const Power_Mode & power() const { return Transducer::power(); }
     void power(const Power_Mode & mode) const { Transducer::power(mode); }
 
     friend Debug & operator<<(Debug & db, const Smart_Data & d) {
         db << "{";
-        if(d.local()) {
+        if(d._device != REMOTE) {
             switch(d._mode) {
             case PRIVATE:    db << "PRI."; break;
             case ADVERTISED: db << "ADV."; break;
@@ -368,10 +305,12 @@ private:
                         _predictor = 0;
                     }
                 } else if(interest->period()) {
+
+
                     if(((_mode & PREDICTIVE) == PREDICTIVE) && interest->predictive() && interest->predictor() == Predictor::TYPE){
                         if(interest->has_config()){
                             if(!_predictor){
-                                _predictor = new Predictor(this, *interest->predictor_config<Predictor_Configuration>(), remote());
+                                _predictor = new Predictor(this, *interest->predictor_config<Predictor_Configuration>(), _device==REMOTE);
                                 _predictive = new Predictive(typename Predictor::Model(), _unit, _error, _expiry);
                                 if(Predictor::LISTENER)
                                     _responsive->model_listener(true);
@@ -394,18 +333,16 @@ private:
                             _thread->period(interest->period());
                     }
                 } else {
-                    if(Transducer::POLLING){
-                       Transducer::sense(_device, this);
-                       _time = TSTP::now();
+                    Transducer::sense(_device, this);
+                    _time = TSTP::now();
 
-                       if(_predictor){
-                           //TODO: what about predictor mode?
-                       } else {
-                           _responsive->value(_value);
-                           _responsive->time(_time);
-                           _responsive->respond(_time + interest->expiry());
-                       }
-                   }
+                    if(_predictor){
+                        //TODO
+                    } else {
+                        _responsive->value(_value);
+                        _responsive->time(_time);
+                        _responsive->respond(_time + interest->expiry());
+                    }
                 }
             }
         } break;
@@ -420,7 +357,6 @@ private:
                 _error = response->error();
                 _coordinates = response->origin();
                 _time = response->time();
-                _device = response->device();
                 db<Smart_Data>(INF) << "Smart_Data:update[R]:this=" << this << " => " << *this << endl;
                 notify();
             }
@@ -429,11 +365,9 @@ private:
             if(((_mode & COMMANDED) == COMMANDED)) {
                 // TODO: Check if this command was already treated
                 TSTP::Command * command = reinterpret_cast<TSTP::Command *>(packet);
-                if(local() && command->time() > _time) {
+                if(_device != REMOTE)
                     Transducer::actuate(_device, this, *(command->command<Value>()));
-                    _coordinates = command->origin();
-                    _time = command->time();
-                }
+                _coordinates = command->origin();
             }
         } break;
         case TSTP::CONTROL: {
@@ -442,13 +376,12 @@ private:
                 TSTP::Model * model = reinterpret_cast<TSTP::Model *>(packet);
                 if(model->model<Model_Common>()->type() == Predictor::Model::TYPE) {
                     if(_predictor){
-                        _coordinates = model->origin();
+                        _time = model->time();
                         _error = model->error();
+                        _coordinates = model->origin();
                         _predictor->update(*model->model<typename Predictor::Model>(), false);
-                        _predictor->predict(this, model->time());
+                        _value = _predictor->predict(_time);
                         notify();
-                        if(!_thread)
-                            _thread = new Periodic_Thread(_interested->period(), &updater, this);
                     }
                 }
             } break;
@@ -479,12 +412,8 @@ private:
     static int updater(unsigned int dev, Time_Offset expiry, Smart_Data * data) {
         do {
             Time t = TSTP::now();
-            if(data->local() && (data->_mode & ADVERTISED) != ADVERTISED) {
-                Transducer::sense(dev, data);
-                data->_time = t;
-                data->notify();
-            } else if(t < data->_responsive->t1()) {
-                // TODO: The thread should be deleted or suspended when time is up
+            // TODO: The thread should be deleted or suspended when time is up
+            if(t < data->_responsive->t1()) {
                 Transducer::sense(dev, data);
                 data->_time = t;
 
@@ -506,15 +435,10 @@ private:
         return 0;
     }
 
-    // Predictive update
-    static int updater(Smart_Data * data) {
-        do {
-            data->_predictor->predict(data, TSTP::now());
-            data->_error = 1;
-            data->notify();
-        } while(Periodic_Thread::wait_next());
-        return 0;
-    }
+    //TODO
+    //void update(const typename Predictor::Model & model, Region * region) {
+    //    _interested->predictor_update(model);
+    //}
 
 private:
     Unit _unit;
@@ -524,7 +448,6 @@ private:
     TSTP::Time _time;
     TSTP::Time _expiry;
 
-    bool _remote;
     unsigned int _device;
     unsigned char _mode;
     Periodic_Thread * _thread;

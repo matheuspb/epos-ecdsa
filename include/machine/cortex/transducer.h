@@ -4,6 +4,7 @@
 #define __cortex_transducer_h
 
 #include <smart_data.h>
+
 #include <keyboard.h>
 #include <smart_plug.h>
 #include <hydro_board.h>
@@ -16,16 +17,14 @@
 #include <spi.h>
 #include <rs485.h>
 #include "hcsr04.h"
-#include <machine.h>
-#include <i2c.h>
-#include <imu.h>
 
 __BEGIN_SYS
 
 class Keyboard_Sensor: public Keyboard
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Acceleration; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Acceleration;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = true;
@@ -35,7 +34,7 @@ public:
     typedef Keyboard::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     Keyboard_Sensor() {}
@@ -52,7 +51,7 @@ public:
 
 #ifdef __mmod_emote3__
 
-template<unsigned int _U, int _E=0, bool _I=false, bool _P=true>
+template<unsigned int _U, unsigned int _N=TSTP::Unit::I32, int _E=0, bool _I=false, bool _P=true>
 class Dummy_Transducer
 {
 public:
@@ -60,9 +59,10 @@ public:
     typedef _UTIL::Observer Observer;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
     static const unsigned int UNIT = _U;
+    static const unsigned int NUM = _N;
     static const int ERROR = _E;
     static const bool INTERRUPT = _I;
     static const bool POLLING = _P;
@@ -79,54 +79,18 @@ private:
     static Observed _observed;
 };
 
-/*
- * Capacitive Transmitters Series 46 X / 46 X Ei
- *
- * Reference: http://www.keller-druck.com/home_e/paprod_e/46x_e.asp
-*/
-class Pressure_Sensor_Keller_Capacitive: public Hydro_Board
-{
-public:
-    static const unsigned int UNIT = TSTP::Unit::Length; // I32 by default
-    static const int ERROR = 0; // Unknown
-
-    static const bool INTERRUPT = false;
-    static const bool POLLING = true;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-    Pressure_Sensor_Keller_Capacitive(unsigned int dev, unsigned int hydro_relay_power, unsigned int hydro_adc) {
-        _hydro_relay_power = hydro_relay_power;
-        _hydro_adc = hydro_adc;
-    }
-
-    static void sense(unsigned int dev, Smart_Data<Pressure_Sensor_Keller_Capacitive> * data) {
-        Hydro_Board::on(_hydro_relay_power);
-        Machine::delay(2000000);
-        data->_value = Hydro_Board::read(_hydro_adc);
-        Hydro_Board::off(_hydro_relay_power);
-    }
-
-    static void actuate(unsigned int dev, Smart_Data<Pressure_Sensor_Keller_Capacitive> * data, const Smart_Data<Pressure_Sensor_Keller_Capacitive>::Value & command) {}
-
-private:
-    static unsigned int _hydro_relay_power;
-    static unsigned int _hydro_adc;
-};
-
 class Water_Level_Sensor: public Hydro_Board
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Length; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Length;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Water_Level_Sensor> * data) {
@@ -136,50 +100,18 @@ public:
     static void actuate(unsigned int dev, Smart_Data<Water_Level_Sensor> * data, const Smart_Data<Water_Level_Sensor>::Value & command) {}
 };
 
-class Water_Level_Sensor_Ultrasonic_Microflex: public Hydro_Board
-{
-public:
-    static const unsigned int UNIT = TSTP::Unit::Length; // I32 by default
-    static const int ERROR = 0; // Unknown
-
-    static const bool INTERRUPT = false;
-    static const bool POLLING = true;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-     Water_Level_Sensor_Ultrasonic_Microflex(unsigned int dev, unsigned int hydro_relay_power, unsigned int hydro_adc) {
-        _hydro_relay_power = hydro_relay_power;
-        _hydro_adc = hydro_adc;
-    }
-
-    static void sense(unsigned int dev, Smart_Data<Water_Level_Sensor_Ultrasonic_Microflex> * data) {
-        Hydro_Board::on(_hydro_relay_power);
-        Machine::delay(20000000);
-        data->_value = Hydro_Board::read(_hydro_adc);
-        Hydro_Board::off(_hydro_relay_power);
-    }
-
-    static void actuate(unsigned int dev, Smart_Data<Water_Level_Sensor_Ultrasonic_Microflex> * data, const Smart_Data<Water_Level_Sensor_Ultrasonic_Microflex>::Value & command) {}
-
-private:
-    static unsigned int _hydro_relay_power;
-    static unsigned int _hydro_adc;
-};
-
 class Water_Turbidity_Sensor: public Hydro_Board
 {
 public:
-    // I32 by default
     static const unsigned int UNIT = TSTP::Unit::Amount_of_Substance; // TODO
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Water_Turbidity_Sensor> * data) {
@@ -189,128 +121,23 @@ public:
     static void actuate(unsigned int dev, Smart_Data<Water_Turbidity_Sensor> * data, const Smart_Data<Water_Turbidity_Sensor>::Value & command) {}
 };
 
-class Water_Turbidity_Sensor_Solar: public Hydro_Board
-{
-public:
-    // I32 by default
-    static const unsigned int UNIT = TSTP::Unit::Amount_of_Substance; // TODO
-    static const int ERROR = 0; // Unknown
-
-    static const bool INTERRUPT = false;
-    static const bool POLLING = true;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-    Water_Turbidity_Sensor_Solar(unsigned int dev, unsigned int hydro_relay_power, unsigned int hydro_adc, unsigned int hydro_relay_infrared, unsigned int hydro_adc_infrared){
-        _hydro_relay_power = hydro_relay_power;
-        _hydro_adc = hydro_adc;
-    }
-
-    static void sense(unsigned int dev, Smart_Data<Water_Turbidity_Sensor_Solar> * data) {
-        Hydro_Board::on(_hydro_relay_power);
-        // Filter daylight as directed by sensor manufacturer
-        Machine::delay(3250000);
-        int daylight = Hydro_Board::read(_hydro_adc);
-        Hydro_Board::on(_hydro_relay_infrared);
-        Machine::delay(450000);
-        int mixed = Hydro_Board::read(_hydro_adc_infrared);
-        Hydro_Board::off(_hydro_relay_infrared);
-        Hydro_Board::off(_hydro_relay_power);
-        if(mixed - daylight < 0)
-        {
-            data->_value = 0;
-        }
-        else
-        {
-            data->_value = mixed - daylight;
-        }
-    }
-
-    static void actuate(unsigned int dev, Smart_Data<Water_Turbidity_Sensor_Solar> * data, const Smart_Data<Water_Turbidity_Sensor_Solar>::Value & command) {}
-
-private:
-    static unsigned int _hydro_relay_power;
-    static unsigned int _hydro_adc;
-    static unsigned int _hydro_relay_infrared;
-    static unsigned int _hydro_adc_infrared;
-};
-
-/*
- *Campbell Scientific OBS-3+
- *
- * Ranges: (depends on sediment size, particle shape, and reflectivity)
- *  Turbidity (low/high): 250/1000 NTU; 500/2000 NTU; 1000/4000 NTU
- *  Mud: 5000 to 10,000 mg L–1
- *  Sand: 50,000 to 100,000 mg L–1
- * Accuracy: (whichever is larger)
- *  Turbidity: 2% of reading or 0.5 NTU
- *  Mud: 2% of reading or 1 mg L–1
- *  Sand: 4% of reading or 10 mg L–1
- * Resolution:
- *  16-bit ADC - This is what is supported!
- *      Turbidity: 0.004/0.01 NTU; 0.008/0.03 NTU; 0.01/0.06 NTU
- *  12-bit ADC
- *      Turbidity: 0.06/0.2 NTU; 0.1/0.5 NTU; 0.2/1.0 NTU
- *
- * Minimum stabilization time: 2s
- * Maximum data rate = 10Hz (100ms/sample)
-*/
-class Water_Turbidity_Sensor_OBS: public Hydro_Board
-{
-public:
-    static const unsigned int MAX_DEVICES = 4;
-    // I32 by default
-    static const unsigned int UNIT = TSTP::Unit::Amount_of_Substance; // TODO
-    static const int ERROR = 0; // Unknown
-
-    static const bool INTERRUPT = false;
-    static const bool POLLING = true;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-    Water_Turbidity_Sensor_OBS(unsigned int dev, unsigned int hydro_relay_power, unsigned int hydro_adc){
-        assert(dev < MAX_DEVICES);
-        _dev[dev] = this;
-        _hydro_relay_power = hydro_relay_power;
-        _hydro_adc = hydro_adc;
-    }
-
-    static void sense(unsigned int dev, Smart_Data<Water_Turbidity_Sensor_OBS> * data) {
-        Machine::delay(250000); // Wait 250 ms before reading
-        Hydro_Board::on(_hydro_relay_power);
-        Machine::delay(2000000);
-        data->_value = Hydro_Board::read(_hydro_adc);
-        Hydro_Board::off(_hydro_relay_power);
-    }
-
-    static void actuate(unsigned int dev, Smart_Data<Water_Turbidity_Sensor_OBS> * data, const Smart_Data<Water_Turbidity_Sensor_OBS>::Value & command) {}
-
-private:
-    static Water_Turbidity_Sensor_OBS * _dev[MAX_DEVICES];
-    static unsigned int _hydro_relay_power;
-    static unsigned int _hydro_adc;
-};
-
 class Water_Flow_Sensor: public Hydro_Board
 {
 public:
-    // I32 by default
     static const unsigned int UNIT = TSTP::Unit::Water_Flow;// m^3/s
+
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Water_Flow_Sensor> * data) {
-
+        
         //Convert pulses to liters/s
 
         data->_value = water_flow();
@@ -323,24 +150,26 @@ public:
 class Water_Flow_Sensor_WSTAR: public Hydro_Board
 {
 public:
-    // I32 by default
     static const unsigned int UNIT = TSTP::Unit::Water_Flow;// m^3/s
-
+    
+    static const unsigned int NUM = TSTP::Unit::I32;
     //static const char FACTOR = TSTP::Unit::Factor::MILI;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
-    static const unsigned int LITRES_PER_PULSE = 100;
-
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Water_Flow_Sensor_WSTAR> * data) {
+
+        //unsigned long long period = (data->_time - TSTP::now())/1000000;
         int pulses = water_flow();
-        data->_value = pulses * LITRES_PER_PULSE;
+        int pulse_to_liter = 100;
+        //for now, sending as liters (or milimeters)
+        data->_value = pulses*pulse_to_liter;
     }
 
     static void actuate(unsigned int dev, Smart_Data<Water_Flow_Sensor_WSTAR> * data, const Smart_Data<Water_Flow_Sensor_WSTAR>::Value & command) {}
@@ -350,24 +179,26 @@ public:
 class Water_Flow_Sensor_M170: public Hydro_Board
 {
 public:
-    // I32 by default
     static const unsigned int UNIT = TSTP::Unit::Water_Flow;// m^3/s
 
-    //static const char FACTOR = TSTP::Unit::Factor::MILI;
+    static const unsigned int NUM = TSTP::Unit::I32;
+    //static const char FACTOR = TSTP::Unit::Factor::MILI;    
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
-    static const unsigned int LITRES_PER_PULSE = 10;
-
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Water_Flow_Sensor_M170> * data) {
+
+        //unsigned long long period = (data->_time - TSTP::now())/1000000;
         int pulses = water_flow();
-        data->_value = pulses * LITRES_PER_PULSE;
+        int pulse_to_liter = 10;
+        //for now, sending as liters (or milimeters)
+        data->_value = pulses*pulse_to_liter;
     }
 
     static void actuate(unsigned int dev, Smart_Data<Water_Flow_Sensor_M170> * data, const Smart_Data<Water_Flow_Sensor_M170>::Value & command) {}
@@ -376,16 +207,15 @@ public:
 class Pluviometer: public Hydro_Board
 {
 public:
-    // I32 by default
-    static const unsigned int UNIT = TSTP::Unit::Length; // mm
-    //static const char FACTOR = TSTP::Unit::Factor::MILI;
+    static const unsigned int UNIT = TSTP::Unit::DIV | TSTP::Unit::Length; // TODO: we want mm, or mm/m^2
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Pluviometer> * data) {
@@ -398,7 +228,8 @@ public:
 class Active_Power_Sensor: public Smart_Plug
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Power;// I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Power;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
@@ -408,7 +239,7 @@ public:
     typedef Smart_Plug::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     static void sense(unsigned int dev, Smart_Data<Active_Power_Sensor> * data) {
@@ -423,7 +254,8 @@ public:
 class ADC_Sensor // TODO
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Luminous_Intensity; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Luminous_Intensity;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
@@ -433,7 +265,7 @@ public:
     typedef _UTIL::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     ADC_Sensor() {}
@@ -457,51 +289,11 @@ private:
     static Observed _observed;
 };
 
-// TODO: Implement a lux curve
-class Lux_Sensor
-{
-public:
-    static const unsigned int UNIT = TSTP::Unit::Luminous_Intensity; // I32 by default
-    static const int ERROR = 0; // Unknown
-
-    static const bool INTERRUPT = false;
-    static const bool POLLING = true;
-
-    typedef _UTIL::Observer Observer;
-    typedef _UTIL::Observed Observed;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-    Lux_Sensor(ADC * adc) { 
-        _adc = adc; 
-    }
-
-    static void sense(unsigned int dev, Smart_Data<Lux_Sensor> * data) {
-        data->_value = _adc->read();
-    }
-
-    static void actuate(unsigned int dev, Smart_Data<Lux_Sensor> * data, const Smart_Data<Lux_Sensor>::Value & command) {}
-
-    static void attach(Observer * obs) { _observed.attach(obs); }
-    static void detach(Observer * obs) { _observed.detach(obs); }
-
-private:
-    static bool notify() { return _observed.notify(); }
-
-    static void init();
-
-private:
-    static Observed _observed;
-    static ADC * _adc;
-};
-
-
 class Temperature_Sensor // TODO
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Temperature; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Temperature;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
@@ -511,7 +303,7 @@ public:
     typedef _UTIL::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     Temperature_Sensor() {
@@ -547,47 +339,13 @@ private:
     static Observed _observed;
 };
 
-class I2C_Temperature_Transducer
-{
-    typedef TSTP::Unit Unit;
-public:
-    static const unsigned int UNIT = Unit::Get_Quantity<Unit::Temperature,Unit::F32>::UNIT;
-    static const int ERROR = 0; // Unknown
-
-    static const bool INTERRUPT = false;
-    static const bool POLLING = true;
-
-public:
-    typedef _UTIL::Observer Observer;
-    typedef _UTIL::Observed Observed;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-    I2C_Temperature_Transducer() {}
-
-    static void sense(unsigned int dev, Smart_Data<I2C_Temperature_Transducer> * data) {
-        data->_value = sensor.get();
-    }
-
-    static void actuate(unsigned int dev, Smart_Data<I2C_Temperature_Transducer> * data, const Smart_Data<I2C_Temperature_Transducer>::Value & command) {
-        data->_value = command;
-    }
-
-    static void attach(Observer * obs) {}
-    static void detach(Observer * obs) {}
-
-private:
-    static I2C_Temperature_Sensor sensor;
-};
-
 class Switch_Sensor: public GPIO
 {
     static const unsigned int MAX_DEVICES = 8;
 
 public:
-    static const unsigned int UNIT = TSTP::Unit::Switch; // digital unit
+    static const unsigned int UNIT = TSTP::Unit::Switch;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = true;
@@ -597,7 +355,7 @@ public:
     typedef _UTIL::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     Switch_Sensor(unsigned int dev, char port, unsigned int pin, const GPIO::Direction & dir, const GPIO::Pull & p = GPIO::UP)
@@ -614,13 +372,12 @@ public:
 
     static void sense(unsigned int dev, Smart_Data<Switch_Sensor> * data) {
         assert(dev < MAX_DEVICES);
-        data->_value = static_cast<unsigned char>(_dev[dev]->get());
+        data->_value = _dev[dev]->get();
     }
 
     static void actuate(unsigned int dev, Smart_Data<Switch_Sensor> * data, const Smart_Data<Switch_Sensor>::Value & command) {
         assert(dev < MAX_DEVICES);
-        Smart_Data<Switch_Sensor>::Value cmm = command;
-        _dev[dev]->set(cmm); // implicit conversion to bool
+        _dev[dev]->set(command);
         data->_value = command;
     }
 
@@ -644,7 +401,8 @@ class RFID_Sensor
     static const unsigned int MAX_DEVICES = 8;
 
 public:
-    static const unsigned int UNIT = TSTP::Unit::RFID; // digital unit
+    static const unsigned int UNIT = TSTP::Unit::RFID;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = true;
@@ -654,7 +412,7 @@ public:
     typedef RFID_Reader::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     class Data : private RFID_Reader::UID
@@ -736,38 +494,30 @@ class Distance_Sensor : private HCSR04
     static const unsigned int MAX_DEVICES = 8;
 
 public:
-    static const unsigned int UNIT = TSTP::Unit::Length; // I32 by defaut
+    static const unsigned int UNIT = TSTP::Unit::Length;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
     static const bool POLLING = true;
 
-    static const unsigned int RELAY_DELAY = 10000000;
-
     typedef _UTIL::Observed Observed;
     typedef _UTIL::Observer Observer;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
-    Distance_Sensor(unsigned int dev, GPIO * trigger, GPIO * echo, GPIO * relay = 0) : HCSR04(trigger, echo) {
+    Distance_Sensor(unsigned int dev, GPIO * trigger, GPIO * echo) : HCSR04(trigger, echo) {
         assert(dev < MAX_DEVICES);
         _dev[dev] = this;
-        _relay = relay;
     }
 
     static void sense(unsigned int dev, Smart_Data<Distance_Sensor> * data) {
         assert(dev < MAX_DEVICES);
         if(_dev[dev]) {
             while(!_dev[dev]->ready_to_get());
-            if(_relay) {
-                _relay->set();
-                Machine::delay(RELAY_DELAY);
-            }
             data->_value = _dev[dev]->get();
-            if(_relay)
-                _relay->clear();
         }
     }
 
@@ -778,13 +528,13 @@ public:
 
 private:
     static Distance_Sensor * _dev[MAX_DEVICES];
-    static GPIO * _relay;
 };
 
 class Vibration_Sensor
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Force; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Force;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
@@ -794,14 +544,14 @@ public:
     typedef _UTIL::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     Vibration_Sensor() {}
 
     static void sense(unsigned int dev, Smart_Data<Vibration_Sensor> * data) {
         ADC adc(static_cast<ADC::Channel>(dev));
-        data->_value = adc.convert(adc.read(),3300);
+        data->_value = adc.convert(adc.read(),3300);            
     }
 
     static void actuate(unsigned int dev, Smart_Data<Vibration_Sensor> * data, const Smart_Data<Vibration_Sensor>::Value & command) {}
@@ -821,7 +571,8 @@ private:
 class Sound_Sensor
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Sound_Intensity; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Sound_Intensity;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
@@ -831,7 +582,7 @@ public:
     typedef _UTIL::Observed Observed;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
 public:
     Sound_Sensor() {}
@@ -891,7 +642,7 @@ public:
 protected:
     static float sense(const char * command) {
         union {
-            char c[4];
+            char c[4]; 
             float f;
         } conv;
 
@@ -903,12 +654,12 @@ protected:
         conv.c[1] = 0;
         conv.c[2] = res[5];
         conv.c[3] = res[4];
-
+    
         int quantity_code = command[6];
         if(quantity_code == CURRENT)
-            conv.f *= 40; // Current conversion factor
+            conv.f *= 40; // Current conversion factor 
         else if(quantity_code == ACTIVE_POWER)
-            conv.f *= -40; // Active Power conversion factor
+            conv.f *= -40; // Active Power conversion factor 
         else if(quantity_code == POWER_FACTOR) {
             // The Power factor is always positive
             if(conv.f < 0)
@@ -929,15 +680,15 @@ private:
 template<unsigned int U>
 class SSB_Substation_Common: protected SSB_Substation_Sensor
 {
-    typedef TSTP::Unit Unit;
 public:
     typedef _UTIL::Observed Observed;
     typedef _UTIL::Observer Observer;
 
     typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
+    struct Predictor_Configuration : public Predictor::Configuration {};
 
-    static const unsigned int UNIT = Unit::Get_Quantity<U,Unit::F32>::UNIT;
+    static const unsigned int UNIT = U;
+    static const unsigned int NUM = TSTP::Unit::F32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = false;
@@ -991,209 +742,6 @@ public:
     static void actuate(unsigned int dev, Smart_Data<SSB_Substation_Average_Power_Factor> * data, const Smart_Data<SSB_Substation_Average_Power_Factor>::Value & command) {}
 };
 
-class Angular_Rate_Analyzer
-{
-private:
-    static const unsigned int BATCH_SIZE = 5; // 5 * (offset + x + y + z)
-    static const unsigned int BUFFER_SIZE = 150; // 150 * ( 5 * (offset+x+y+z) )
-    static const unsigned int SD_PERIOD = 2000000; // 2s
-    static const unsigned int FREQUENCY = 30; // Hz
-    static const unsigned int PERIOD = ((1/FREQUENCY)*1000000);
-    static const float THRESHOLD = 0.01f;
-    static const float THRESHOLD_NOISE = 0.1f;
-
-    template<unsigned int S> struct _Data;
-
-    typedef _UTIL::Observed Observed;
-    typedef _UTIL::Observer Observer;
-
-public:
-    typedef _Data<BATCH_SIZE> Data;
-
-    Angular_Rate_Analyzer() {}
-
-    static void init() {
-        _data_buffer = new Data_Buffer();
-        _buffer = new Semaphore(0);
-        _imu = new LSM330();
-        _imu->beginAcc();
-        _imu->beginGyro();
-        _th_publisher = new Thread(&publisher);
-        _th_analyzer = new Thread(&analyzer);
-        _initialized = true;
-    }
-
-    static void attach(Observer * obs) {
-        if(!_initialized){ init(); }
-        _observed.attach(obs);
-    }
-    static void detach(Observer * obs) { _observed.detach(obs); }
-
-private:
-    static bool notify() { return _observed.notify(); }
-
-    template<unsigned int S>
-    struct _Data
-    {
-        static const unsigned int SIZE = S;
-        struct Measure
-        {
-            friend OStream & operator<<(OStream & os, const Measure & m) {
-                os << "("<<m.x<<","<<m.y<<","<<m.z<<","<<m.offset<<")";
-                return os;
-            }
-            short offset; // in ms
-            float x;
-            float y;
-            float z;
-        } __attribute__((packed));
-
-        friend OStream & operator<<(OStream & os, const _Data<S> & d) {
-            for(int i = 0; i < S; i++){
-                os << d.m[i];
-                if(i < (S-1)) os << ";" << endl << "           ";
-            }
-            return os;
-        }
-
-        Measure m[S];
-    } __attribute__((packed));
-
-    typedef Ordered_List<Data, TSTP::Time> Data_Buffer;
-
-    static int analyzer(){
-        //OStream cout;
-        static const unsigned short MAX = -1;
-        unsigned int index = 0;
-        Data * data = new Data();
-        TSTP::Time ts = 0;
-        TSTP::Time last_t = 0;
-        float last_x = 0;
-        float last_y = 0;
-        float last_z = 0;
-
-        while(true) {
-            TSTP::Time t = TSTP::now();
-            if(!_imu->measureAngles())
-                continue;
-
-            float diff_x = abs(last_x - _imu->gyro_x);
-            float diff_y = abs(last_y - _imu->gyro_y);
-            float diff_z = abs(last_z - _imu->gyro_z);
-
-            if(( diff_x     > (abs(_imu->gyro_x) > 0.5f ? THRESHOLD : THRESHOLD_NOISE) ) ||
-               ( diff_y     > (abs(_imu->gyro_y) > 0.5f ? THRESHOLD : THRESHOLD_NOISE) ) ||
-               ( diff_z     > (abs(_imu->gyro_z) > 0.5f ? THRESHOLD : THRESHOLD_NOISE) ) ||
-               (t - last_t) > (abs(_imu->gyro_x) > 0.5f ? 800000 : 6*SD_PERIOD) )
-            {
-
-                last_t = t;
-                last_x = _imu->gyro_x;
-                last_y = _imu->gyro_y;
-                last_z = _imu->gyro_z;
-
-                TSTP::Time offset = 0;
-                if(index > 0){
-                    offset = ((t - ts)/1000) - data->m[index-1].offset; // offset in ms
-                    if(offset > MAX){
-                        index = 0;
-                    }
-                }
-
-                if(index == 0){
-                    ts = t;
-                    data->m[index].offset = 0;
-                } else {
-                    data->m[index].offset = offset;
-                }
-
-                data->m[index].x = _imu->gyro_x;
-                data->m[index].y = _imu->gyro_y;
-                data->m[index].z = _imu->gyro_z;
-
-                index++;
-
-                if(index == Data::SIZE){
-                    index = 0;
-                    Data_Buffer::Element * el = 0;
-                    if(_data_buffer->size() >= BUFFER_SIZE){
-                        _buffer->p();
-                        el = _data_buffer->remove();
-                        Data * obj = el->object();
-                        delete obj;
-                        delete el;
-                        el = 0;
-                    }
-                    el =  new Data_Buffer::Element(data, ts);
-                    _data_buffer->insert(el);
-                    //cout <<"Push ["<<_data_buffer->size() << "] : " << (*data) << endl;
-                    _buffer->v();
-
-                    data = new Data(); // to be used in the next round
-                }
-            }
-        }
-        return 0;
-    }
-
-    static int publisher() {
-        while(true) {
-            notify();
-            Alarm::delay(SD_PERIOD);
-        }
-        return 0;
-    }
-
-private:
-    static Data_Buffer * _data_buffer;
-    static LSM330 * _imu;
-    static Semaphore * _buffer;
-    static Thread * _th_publisher;
-    static Thread * _th_analyzer;
-    static Observed _observed;
-    static bool _initialized;
-};
-
-class Angular_Rate_Analyzer_Wrapper : private Angular_Rate_Analyzer
-{
-public:
-    static const unsigned int UNIT = TSTP::Unit::Digital_Unit<((1<<15)-1),sizeof(Angular_Rate_Analyzer::Data)>::UNIT;
-    static const int ERROR = 0;
-
-    static const bool INTERRUPT = true;
-    static const bool POLLING = false;
-
-    typedef _UTIL::Observed Observed;
-    typedef _UTIL::Observer Observer;
-
-    typedef Dummy_Predictor Predictor;
-    typedef Predictor::Configuration Predictor_Configuration;
-
-public:
-    static void attach(Observer * obs) { Angular_Rate_Analyzer::attach(obs); }
-    static void detach(Observer * obs) { Angular_Rate_Analyzer::detach(obs); }
-
-    template<typename SD>
-    static void sense(unsigned int dev, SD * sd) {
-        // OStream cout;
-        _buffer->p();
-        Data_Buffer::Element * el = _data_buffer->remove();
-        Data * data = el->object();
-        TSTP::Time now = TSTP::now();
-        TSTP::Time t_diff = (now - el->rank())/1000;
-        sd->_time = now;
-        data->m[0].offset -= t_diff;
-        sd->_value = *data;
-        // cout <<"Pop ["<<_data_buffer->size() << "] : " << (*data) << endl;
-        delete data;
-        delete el;
-    }
-
-    template<typename SD>
-    static void actuate(unsigned int dev, SD * sd, const typename SD::Value & command) { }
-};
-
-typedef Smart_Data<Angular_Rate_Analyzer_Wrapper> Angular_Rate;
 
 typedef Smart_Data<SSB_Substation_Current> SSB_Current;
 typedef Smart_Data<SSB_Substation_Voltage_R> SSB_Voltage_R;
@@ -1204,19 +752,12 @@ typedef Smart_Data<SSB_Substation_Average_Power_Factor> SSB_Average_Power_Factor
 
 typedef Smart_Data<Active_Power_Sensor> Active_Power;
 typedef Smart_Data<ADC_Sensor> Luminous_Intensity;
-typedef Smart_Data<Lux_Sensor> Lux;
 typedef Smart_Data<Temperature_Sensor> Temperature;
-typedef Smart_Data<I2C_Temperature_Transducer> I2C_Temperature;
 typedef Smart_Data<Water_Flow_Sensor> Water_Flow;
 typedef Smart_Data<Water_Flow_Sensor_WSTAR> Water_Flow_WSTAR;
 typedef Smart_Data<Water_Flow_Sensor_M170> Water_Flow_M170;
 typedef Smart_Data<Water_Level_Sensor> Water_Level;
-typedef Smart_Data<Pressure_Sensor_Keller_Capacitive> Pressure_Keller_Capacitive;
-typedef Smart_Data<Water_Level_Sensor_Ultrasonic_Microflex> Water_Level_Ultrasonic_Microflex;
 typedef Smart_Data<Water_Turbidity_Sensor> Water_Turbidity;
-typedef Smart_Data<Water_Turbidity_Sensor_Solar> Water_Turbidity_Solar;
-typedef Smart_Data<Water_Turbidity_Sensor_OBS> Water_Turbidity_OBS;
-
 typedef Smart_Data<Pluviometer> Rain;
 typedef Smart_Data<RFID_Sensor> RFID;
 typedef Smart_Data<Switch_Sensor> Presence;

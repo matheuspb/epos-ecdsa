@@ -175,10 +175,6 @@ T variance(const T array[], int size, const T & mean)
 float sin(float);
 float cos(float);
 
-template <typename T>
-float deg2rad(const T degrees) {
-    return (float)degrees * M_PI / 180.0;
-}
 
 __END_UTIL
 

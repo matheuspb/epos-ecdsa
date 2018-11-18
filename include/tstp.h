@@ -23,7 +23,6 @@ public:
     static const unsigned int LAN = 10000; // Nodes
     static const unsigned int NODES = Traits<Build>::NODES;
     static const unsigned int KEY_SIZE = Traits<_SYS::TSTP>::KEY_SIZE;
-    static const unsigned int SEEN_ID_MAX = 32;
 
     // Version
     // This field is packed first and matches the Frame Type field in the Frame Control in IEEE 802.15.4 MAC.
@@ -211,11 +210,11 @@ public:
     class _Header
     {
         // Format
-        // Bit 0      3    5  6    0                0             0        0           0         0         0         0         0         0         0        0
+        // Bit 0      3    5  6    0                0             0        0           0         0         0         0         0         0         0        0          
         //     +------+----+--+----+----------------+-------------+--- ~ ---+--- ~ ----+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ --+--- ~ ----+
         //     | ver  |type|tr|scal|   confidence   |   subtype   |   o.t   |   l.t    |   o.x   |   o.y   |   o.z   |   pad   |   l.x   |   l.y   |   l.z  |   pad    |
         //     +------+----+--+----+----------------+-------------+--- ~ ---+--- ~ ----+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ ---+--- ~ --+--- ~ ----+
-        // Bits          8                  8              16          64        64      8/16/32   8/16/32   8/16/32    8/16/0   8/16/32   8/16/32   8/16/32   8/16/0
+        // Bits          8                  8              16          64        64      8/16/32   8/16/32   8/16/32    8/16/0   8/16/32   8/16/32   8/16/32   8/16/0 
 
     public:
         _Header(const Type & t, unsigned short st = Subtype::NONE, bool tr = false, unsigned char c = 0, const Time & ot = 0, const Coordinates & o = 0, const Coordinates & l = 0, const Version & v = V0)
@@ -311,7 +310,8 @@ public:
 
     typedef Frame PDU;
 
-    // SI Unit defining the Smart_Data semantics (inspired by IEEE 1451 TEDs)
+
+    // TSTP encodes SI Units similarly to IEEE 1451 TEDs
     class Unit
     {
     public:
@@ -365,83 +365,36 @@ public:
             CD      = 7 <<  0
         };
 
-        // Mask to select field LEN of Digital data
-        enum {
-            LEN     = (1 << 16) - 1
-        };
-
-        template<unsigned int _TYPE, unsigned int _LEN>
-        struct Digital_Unit
-        {
-            // TODO: check the UNIT TYPE/LENGTH and generate compile-time error if necessary
-            //            digital | type        | length
-            enum { UNIT = DIGITAL | _TYPE << 16 | _LEN << 0 };
-        private:
-            // Compile-time verifications
-            static const typename IF<(_TYPE & (~((1 << 15) - 1))), void, bool>::Result Invalid_TYPE_Parameter = false;
-            static const typename IF<(_LEN & (~LEN)), void, bool>::Result Invalid_LEN_Parameter = false;
-        };
-
-        template<int _NUM, int _MOD, int _SR, int _RAD, int _M, int _KG, int _S, int _A, int _K, int _MOL, int _CD>
-        struct SI_Unit
-        {
-            // TODO: check the field sizes and generate compile-time error if necessary
-            //            si  | num   | mod   | sr          | rad          | m          | kg          | s          | A         | K         | mol         | cd
-            enum { UNIT = SI  | _NUM  | _MOD  | (4+_SR)<<24 | (4+_RAD)<<21 | (4+_M)<<18 | (4+_KG)<<15 | (4+_S)<<12 | (4+_A)<<9 | (4+_K)<<6 | (4+_MOL)<<3 | (4+_CD) };
-        private:
-            // Compile-time verifications
-            static const typename IF<(_NUM & (~NUM)), void, bool>::Result Invalid_NUM_Parameter = false;
-            static const typename IF<(_MOD & (~MOD)), void, bool>::Result Invalid_MOD_Parameter = false;
-            static const typename IF<((_SR  +4) & (~7u)), void, bool>::Result Invalid_SR_Parameter = false;
-            static const typename IF<((_RAD +4) & (~7u)), void, bool>::Result Invalid_RAD_Parameter = false;
-            static const typename IF<((_M   +4) & (~7u)), void, bool>::Result Invalid_M_Parameter = false;
-            static const typename IF<((_KG  +4) & (~7u)), void, bool>::Result Invalid_KG_Parameter = false;
-            static const typename IF<((_S   +4) & (~7u)), void, bool>::Result Invalid_S_Parameter = false;
-            static const typename IF<((_A   +4) & (~7u)), void, bool>::Result Invalid_A_Parameter = false;
-            static const typename IF<((_K   +4) & (~7u)), void, bool>::Result Invalid_K_Parameter = false;
-            static const typename IF<((_MOL +4) & (~7u)), void, bool>::Result Invalid_MOL_Parameter = false;
-            static const typename IF<((_CD  +4) & (~7u)), void, bool>::Result Invalid_CD_Parameter = false;
-        };
-
-        template<unsigned long QUANTITY, int _NUM>
-        struct Get_Quantity
-        {
-            enum { UNIT = (QUANTITY & (~NUM)) | _NUM };
-        private:
-            // Compile-time verifications
-            static const typename IF<!(QUANTITY & SI), void, bool>::Result QUANTITY_Must_Be_An_SI_Unit = false;
-            static const typename IF<(_NUM & (~NUM)), void, bool>::Result Invalid_NUM_Parameter = false;
-        };
-
         // Typical SI Quantities
         enum Quantity {
-            //                                num, mod,     sr,    rad,      m,     kg,      s,      A,      K,    mol,     cd
-            Length                  = SI_Unit<I32, DIR,     +0,     +0,     +1,     +0,     +0,     +0,     +0,     +0,     +0>::UNIT,
-            Mass                    = SI_Unit<I32, DIR,     +0,     +0,     +0,     +1,     +0,     +0,     +0,     +0,     +0>::UNIT,
-            Time                    = SI_Unit<I32, DIR,     +0,     +0,     +0,     +0,     +1,     +0,     +0,     +0,     +0>::UNIT,
-            Current                 = SI_Unit<I32, DIR,     +0,     +0,     +0,     +0,     +0,     +1,     +0,     +0,     +0>::UNIT,
+            //                        si      | mod     | sr            | rad           |  m            |  kg           |  s            |  A            |  K            |  mol          |  cd
+            Length                  = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 1) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Mass                    = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 1) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Time                    = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 0) << 15 | (4 + 1) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Current                 = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 1) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
             Electric_Current        = Current,
-            Temperature             = SI_Unit<I32, DIR,     +0,     +0,     +0,     +0,     +0,     +0,     +1,     +0,     +0>::UNIT,
-            Amount_of_Substance     = SI_Unit<I32, DIR,     +0,     +0,     +0,     +0,     +0,     +0,     +0,     +1,     +0>::UNIT,
-            Luminous_Intensity      = SI_Unit<I32, DIR,     +0,     +0,     +0,     +0,     +0,     +0,     +0,     +0,     +1>::UNIT,
-            Area                    = SI_Unit<I32, DIR,     +0,     +0,     +2,     +0,     +0,     +0,     +0,     +0,     +0>::UNIT,
-            Volume                  = SI_Unit<I32, DIR,     +0,     +0,     +3,     +0,     +0,     +0,     +0,     +0,     +0>::UNIT,
-            Speed                   = SI_Unit<I32, DIR,     +0,     +0,     +1,     +0,     -1,     +0,     +0,     +0,     +0>::UNIT,
+            Temperature             = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 1) << 6  | (4 + 0) << 3  | (4 + 0),
+            Amount_of_Substance     = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 1) << 3  | (4 + 0),
+            Luminous_Intensity      = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 1),
+            Area                    = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 2) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Volume                  = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 3) << 18 | (4 + 0) << 15 | (4 + 0) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Speed                   = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 1) << 18 | (4 + 0) << 15 | (4 - 1) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
             Velocity                = Speed,
-            Angular_Speed           = SI_Unit<I32, DIR,     +0,     +1,     +0,     +0,     -1,     +0,     +0,     +0,     +0>::UNIT,
-            Acceleration            = SI_Unit<I32, DIR,     +0,     +0,     +1,     +0,     -2,     +0,     +0,     +0,     +0>::UNIT,
-            Water_Flow              = SI_Unit<I32, DIR,     +0,     +0,     +3,     +0,     -1,     +0,     +0,     +0,     +0>::UNIT,
-            Sound_Intensity         = SI_Unit<I32, DIR,     +0,     +0,     +0,     +1,     -3,     +0,     +0,     +0,     +0>::UNIT,
-            Force                   = SI_Unit<I32, DIR,     +0,     +0,     +1,     +1,     -2,     +0,     +0,     +0,     +0>::UNIT,
-            Voltage                 = SI_Unit<I32, DIR,     +0,     +0,     +2,     +1,     -3,     -1,     +0,     +0,     +0>::UNIT,
-            Power                   = SI_Unit<I32, DIR,     +0,     +0,     +2,     +1,     -3,     +0,     +0,     +0,     +0>::UNIT,
+            Acceleration            = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 1) << 18 | (4 + 0) << 15 | (4 - 2) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Water_Flow              = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 3) << 18 | (4 + 0) << 15 | (4 - 1) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Sound_Intensity         = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 0) << 18 | (4 + 1) << 15 | (4 - 3) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Force                   = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 1) << 18 | (4 + 1) << 15 | (4 - 2) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Voltage                 = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 2) << 18 | (4 + 1) << 15 | (4 - 3) << 12 | (4 - 1) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0),
+            Power                   = 1 << 31 | 0 << 27 | (4 + 0) << 24 | (4 + 0) << 21 | (4 + 2) << 18 | (4 + 1) << 15 | (4 - 3) << 12 | (4 + 0) << 9  | (4 + 0) << 6  | (4 + 0) << 3  | (4 + 0)        
         };
 
         // Custom Digital Units
         enum Custom_Units {
-            //                             type,length
-            RFID                    = Digital_Unit<3,4>::UNIT,
-            Switch                  = Digital_Unit<4,1>::UNIT,
+            //                        digital | type    | length
+            PPM                     = 0 << 31 | 1 << 16 | 8 << 0,
+            RPM                     = 0 << 31 | 2 << 16 | 8 << 0,
+            RFID                    = 0 << 31 | 3 << 16 | 4 << 0,
+            Switch                  = 0 << 31 | 4 << 16 | 4 << 0,
         };
 
         // SI Factors
@@ -466,18 +419,17 @@ public:
             PETA        = (8 + 7)  //     P       1000000000000000
         };
 
+
+        template<int N>
+        struct Get { typedef typename SWITCH<N, CASE<I32, long, CASE<I64, long long int, CASE<F32, float, CASE<D64, double, CASE<DEFAULT, void>>>>>>::Result Type; };
+
+        template<typename T>
+        struct GET { enum { NUM = I32 }; };
+
     public:
         Unit(unsigned long u) { _unit = u; }
 
         operator unsigned long() const { return _unit; }
-
-        unsigned int value_size() const {
-             return (_unit & SI) && ((_unit & NUM) == I32) ? sizeof(long int)
-                     : (_unit & SI) && ((_unit & NUM) == I64) ? sizeof(long long int)
-                         : (_unit & SI) && ((_unit & NUM) == F32) ? sizeof(float)
-                             : (_unit & SI) && ((_unit & NUM) == D64) ? sizeof(double)
-                                 : !(_unit & SI) ? _unit & LEN : 0;
-        }
 
         int sr()  const { return ((_unit & SR)  >> 24) - 4 ; }
         int rad() const { return ((_unit & RAD) >> 21) - 4 ; }
@@ -533,6 +485,23 @@ public:
         unsigned long _unit;
     } __attribute__((packed));
 
+    // SI values (either integer32, integer64, float32, double64)
+    template<int NUM>
+    class Value
+    {
+        typedef typename IF<NUM == TSTP_Common::Unit::I64, long long int,
+                typename IF<NUM == TSTP_Common::Unit::F32, float,
+                typename IF<NUM == TSTP_Common::Unit::D64, double, long int
+                    >::Result>::Result>::Result Number;
+    public:
+        Value(Number v): _value(v) {}
+
+        operator Number() { return _value; }
+
+    private:
+        Number _value;
+    };
+
     // Precision or Error in SI values, expressed as 10^Error
     typedef char Precision;
     typedef char Error;
@@ -556,6 +525,10 @@ template<> struct TSTP_Common::_Padded_Coordinates<TSTP_Common::Scale::CM_32>: p
     _Padded_Coordinates(const _Coordinates<TSTP_Common::Scale::CM_32> & c) : _Coordinates<TSTP_Common::Scale::CM_32>(c) {}
 } __attribute__((packed));
 
+template<> struct TSTP_Common::Unit::GET<long>      { enum { NUM = TSTP_Common::Unit::I32 }; };
+template<> struct TSTP_Common::Unit::GET<long long> { enum { NUM = TSTP_Common::Unit::I64 }; };
+template<> struct TSTP_Common::Unit::GET<float>     { enum { NUM = TSTP_Common::Unit::F32 }; };
+template<> struct TSTP_Common::Unit::GET<double>    { enum { NUM = TSTP_Common::Unit::D64 }; };
 
 __END_SYS
 
@@ -668,32 +641,6 @@ public:
     class Responsive;
     typedef Hash<Responsive, 10, Unit> Responsives;
 
-    // Used to log messages already seen and processed. Messages can be
-    // updated in MAC queue, but should not be throw to the application level.
-    // It is also used in the routing rules.
-    class Seen_ID;
-    typedef Ordered_List<Seen_ID, TSTP::Time> Seen_IDs;
-
-    class Seen_ID {
-        friend class TSTP;
-        friend class Router;
-    public:
-        Seen_ID(TSTP::Frame_ID id, Time time, unsigned char frp, unsigned char brp, unsigned char fb)
-        : _id(id), _forward_radial_progress(frp), _backward_radial_progress(brp), _from_behind(fb), _el(this, time) {}
-        TSTP::Frame_ID id() { return _id; }
-        unsigned char forward_radial_progress() const { return _forward_radial_progress; }
-        unsigned char backward_radial_progress() const { return _backward_radial_progress; }
-        unsigned char from_behind() const { return _from_behind; }
-        Seen_IDs::Element * link() { return &_el; }
-    private:
-        Seen_ID() : _id(-1), _el(this, 0) {}
-    private:
-        TSTP::Frame_ID _id;
-        unsigned char _forward_radial_progress;
-        unsigned char _backward_radial_progress;
-        unsigned char _from_behind;
-        Seen_IDs::Element _el;
-    };
 
     // TSTP Messages
     // Each TSTP message is encapsulated in a single package. TSTP does not need nor supports fragmentation.
@@ -732,8 +679,8 @@ public:
         Error precision() const { return _precision; }
 
         bool predictive() const { return _predictor != Predictor_Common::NONE; }
-        bool has_model() const { return false; /*predictive(); && _has_model;*/ } //TODO: Properly handle message content (configuration or model)
-        bool has_config() const { return predictive(); /*&& !_has_model;*/ } //TODO: Properly handle message content (configuration or model)
+        bool has_model() const { return predictive() && _has_model; }
+        bool has_config() const { return predictive() && !_has_model; }
         Predictor predictor() const { return _predictor; }
 
         bool time_triggered() { return _period; }
@@ -770,23 +717,22 @@ public:
         typedef unsigned char Data[MTU - sizeof(Unit) - sizeof(int) - sizeof(Time) - sizeof(CRC)];
 
     public:
-        Response(const Unit & unit, const Error & error = 0, const Time & expiry = 0, unsigned char device = 0)
-        : Header(RESPONSE, Subtype::NONE, 0, 0, now(), here(), here()), _unit(unit), _error(error), _expiry(expiry), _device(device) {}
+        Response(const Unit & unit, const Error & error = 0, const Time & expiry = 0)
+        : Header(RESPONSE, Subtype::NONE, 0, 0, now(), here(), here()), _unit(unit), _error(error), _expiry(expiry) {}
 
         const Unit & unit() const { return _unit; }
         Error error() const { return _error; }
         Time expiry() const { return _time + _expiry; }
         void expiry(const Time & e) { _expiry = e - _time; }
-        unsigned char device() const { return _device; }
 
-        template<typename Value>
-        void value(const Value & v) {
-            *reinterpret_cast<Value*>(&_data) = v;
+        template<typename T>
+        void value(const T & v) { 
+            *reinterpret_cast<Value<Unit::GET<T>::NUM> *>(&_data) = v;
         }
 
-        template<typename Value>
-        Value value() {
-            return *reinterpret_cast<Value*>(&_data);
+        template<typename T>
+        T value() { 
+            return *reinterpret_cast<Value<Unit::GET<T>::NUM> *>(&_data); 
         }
 
         template<typename T>
@@ -801,7 +747,6 @@ public:
         Unit _unit;
         int _error;
         Time _expiry;
-        unsigned char _device; //TODO: check the adequate type
         Data _data;
         CRC _crc;
     } __attribute__((packed));
@@ -1143,8 +1088,8 @@ public:
     {
     public:
         template<typename T>
-        Responsive(T * data, const Unit & unit, const Error & error, const Time & expiry, unsigned char device, bool epoch_request = false)
-        : Response(unit, error, expiry, device), _size(sizeof(Response) - sizeof(Response::Data) + sizeof(typename T::Value)), _t0(0), _t1(0), _interest(0), _model_listener(false), _link(this, T::UNIT) {
+        Responsive(T * data, const Unit & unit, const Error & error, const Time & expiry, bool epoch_request = false)
+        : Response(unit, error, expiry), _size(sizeof(Response) - sizeof(Response::Data) + sizeof(typename T::Value)), _t0(0), _t1(0), _interest(0), _model_listener(false), _link(this, T::UNIT) {
             db<TSTP>(TRC) << "TSTP::Responsive(d=" << data << ",s=" << _size << ") => " << this << endl;
             db<TSTP>(INF) << "TSTP::Responsive() => " << reinterpret_cast<const Response &>(*this) << endl;
             _responsives.insert(&_link);
@@ -1370,8 +1315,16 @@ public:
             if(!forwarder)
                 return false;
 
-            if(buf->frame()->data<Header>()->origin() == TSTP::here())
-                return false;
+            if(buf->my_distance >= buf->sender_distance) {
+                if(!buf->destined_to_me) {
+                    // Message comes from node closer to the destination
+                    return false;
+                } else {
+                    if(buf->frame()->data<Header>()->type() == INTEREST){
+                        return false;
+                    }
+                }
+            }
 
             // Do not forward messages that come from too far away, to avoid radio range asymmetry
             Coordinates::Distance d = TSTP::here() - buf->frame()->data<Header>()->last_hop();
@@ -1381,109 +1334,21 @@ public:
             TSTP::Time expiry = buf->deadline;
             const TSTP::Time infinite = -1;
 
-            if(expiry != infinite){
-                if(drop_expired && expiry <= TSTP::now())
-                    return false;
-
-                TSTP::Time best_case_delivery_time = (buf->my_distance + RADIO_RANGE - 1) / RADIO_RANGE * Radio::period();
-                TSTP::Time relative_expiry = expiry - TSTP::now();
-
-                // Message will expire soon
-                if(best_case_delivery_time > relative_expiry)
-                    return false;
-
-                buf->deadline -= best_case_delivery_time;
-            }
-
-            bool i_am_a_forwarder = false;
-            unsigned char forward_radial_progress = 0;
-            unsigned char backward_radial_progress = 0;
-            unsigned char from_behind = 0;
-            Seen_IDs::Element * el = 0;
-            for(Seen_IDs::Iterator it = _seen_ids.begin(); it != _seen_ids.end(); it++) {
-                if(it->object()->id() == buf->id) {
-                    el = _seen_ids.remove(it);
-                    buf->id_seen_before = true;
-                    forward_radial_progress = el->object()->forward_radial_progress();
-                    backward_radial_progress = el->object()->backward_radial_progress();
-                    from_behind = el->object()->from_behind();
-                    break;
-                }
-            }
-
-            // NOTICE: Messages with a region as destination must be flooded inside the region.
-            // Nodes that are inside the region (destined to be == true) will retransmit this
-            // message at least once, and more times to guarantee the forward radial progress
-            // (towards the center) and the backward radial progress.
-            if(buf->destined_to_me) {
-                Region dst = TSTP::destination(buf);
-                bool destined_to_sender = ((buf->frame()->data<Header>()->origin() != buf->frame()->data<Header>()->last_hop()) && (dst.contains(buf->frame()->data<Header>()->last_hop(), dst.t0)));
-
-                if(destined_to_sender){
-                    // Sender node is within the sphere (flooding)
-
-                    // Checking the progress made by the sender
-                    if(buf->my_distance >= buf->sender_distance)
-                        forward_radial_progress++;
-                    if(buf->my_distance <= buf->sender_distance)
-                        backward_radial_progress++;
-
-                    // Checking if it's possible/needed to make progress towards the center (destination)
-                    if(buf->my_distance < buf->sender_distance && forward_radial_progress < 1){
-                        i_am_a_forwarder = true;
-                        forward_radial_progress++;
-                    }
-                    // Checking if it's possible/needed to make progress towards the border
-                    if(buf->my_distance > buf->sender_distance && backward_radial_progress < 1){
-                        i_am_a_forwarder = true;
-                        backward_radial_progress++;
-                    }
-                } else {
-                    //  Sender node is out of the sphere, so its waiting for an ack
-                    i_am_a_forwarder = true;
-                }
-
-                if(i_am_a_forwarder && TSTP::destination(buf).radius > 0)
-                    buf->ack = false; // Controlling the flooding termination
-
-            } else {
-                i_am_a_forwarder = buf->my_distance <= buf->sender_distance;
-                // TODO: check the rules below
-                //if(buf->my_distance >= buf->sender_distance){
-                //    i_am_a_forwarder = false;
-                //    forward_radial_progress++;
-                //} else {
-                //    if(forward_radial_progress < 1){
-                //        i_am_a_forwarder = true;
-                //        buf->ack = false;
-                //        forward_radial_progress++;
-                //    } else {
-                //        if(from_behind > 1){
-                //            i_am_a_forwarder = true;
-                //            buf->ack = true;
-                //        }
-                //    }
-                //    from_behind++;
-                //}
-            }
-
-            if(!el){
-                if(_seen_ids.size() >= SEEN_ID_MAX){
-                    el = _seen_ids.remove();
-                    new (el->object()) Seen_ID(buf->id, TSTP::now(), forward_radial_progress, backward_radial_progress, from_behind);
-                }else{
-                    Seen_ID * obj = new Seen_ID(buf->id, TSTP::now(), forward_radial_progress, backward_radial_progress, from_behind);
-                    el = obj->link();
-                }
-            }
-            _seen_ids.insert(el);
-
-            if(i_am_a_forwarder){
-                buf->progress_bits = buf->my_distance < buf->sender_distance ? 0x01 : 0x00;
+            if(expiry == infinite) // Message will not expire
                 return true;
-            } else {
+            else if (expiry <= TSTP::now()) // Expired message
+                return !drop_expired;
+
+            TSTP::Time best_case_delivery_time = (buf->my_distance + RADIO_RANGE - 1) / RADIO_RANGE * Radio::period();
+            TSTP::Time relative_expiry = expiry - TSTP::now();
+
+            // Message will expire soon
+            if(best_case_delivery_time > relative_expiry)
                 return false;
-            }
+
+            buf->deadline -= best_case_delivery_time;
+
+            return true;
         }
 
         // Apply distance routing metric
@@ -1491,15 +1356,10 @@ public:
             if(buf->is_new) {
                 buf->offset *= 1 + (buf->my_distance % RADIO_RANGE);
             } else {
-                Region dst = TSTP::destination(buf);
-                if(buf->destined_to_me && (dst.radius > 0)) {
-                    buf->offset *= dst.radius - buf->my_distance;
-                    buf->offset /= dst.radius;
-                }else{
-                    buf->offset *= RADIO_RANGE + buf->my_distance - buf->sender_distance;
-                    buf->offset /= RADIO_RANGE;
-                }
+                // forward() guarantees that my_distance < sender_distance
+                buf->offset *= RADIO_RANGE + buf->my_distance - buf->sender_distance;
             }
+            buf->offset /= RADIO_RANGE;
         }
     };
 
@@ -2000,7 +1860,6 @@ private:
     static NIC * _nic;
     static Interests _interested;
     static Responsives _responsives;
-    static Seen_IDs _seen_ids;
     static Observed _observed; // Channel protocols are singletons
     static Time _epoch;
     static Global_Coordinates _global_coordinates;

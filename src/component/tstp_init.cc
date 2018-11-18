@@ -19,12 +19,10 @@ void TSTP::Locator::bootstrap()
     _confidence = 100;
 
     // This is used if your machine ID is unlisted below
-    if(Traits<TSTP>::sink) {
+    if(Traits<TSTP>::sink)
         _here = TSTP::sink();
-    }
-    else {
+    else 
         _here = Coordinates(10,10,0); // Adjust this value to the coordinates of the sensor
-    }
 
     // You can edit the values below to define coordinates based on the machine ID
     if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x00\x00\x00\x00", 8)) // Adjust this value to the ID of the mote
@@ -37,27 +35,27 @@ void TSTP::Locator::bootstrap()
     // UFSC - HU mesh 1
     // if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x59\x0e\x16\x06", 8)) { // Sink
     //    _here = TSTP::sink();
-    //    TSTP::coordinates(Global_Coordinates(374677500, -423772800, -293700300));
+    //    TSTP::coordinates(Global_Coordinates(374676700, -423773000, -293701000));
     // }
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x5e\x0e\x16\x06", 8)) // Water flow sensor 1
-    //    _here = Coordinates(100,100,100);
+    //    _here = Coordinates(50,0,0);
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x20\x0f\x16\x06", 8)) // Water flow sensor 2
-    //    _here = Coordinates(-4900,-200,-6100);
+    //    _here = Coordinates(-6000,4500,0);
     
     // UFSC - HU mesh 2
     // if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x31\x0e\x16\x06", 8)) { // Sink
     //    _here = TSTP::sink();
-    //    TSTP::coordinates(Global_Coordinates(374690300, -423766300, -293692900));
+    //    TSTP::coordinates(Global_Coordinates(374690800, -423765800, -293693000));
     // }
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\xb3\x0e\x16\x06", 8)) // Water flow sensor 1
-    //    _here = Coordinates(5500,-100,7000);
+    //    _here = Coordinates(6400,-4800,0);
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\xb0\x0e\x16\x06", 8)) // Water flow sensor 2
-    //    _here = Coordinates(4100,5600,-3000);
+    //    _here = Coordinates(-4800,-6400,0);
 
-    //UFSC - Aplicacao (Carvoeira)
+    //UFSC - Aplicacao
     // if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x59\x0e\x16\x06", 8)) { // Sink
     //     _here = TSTP::sink();
-        // TSTP::coordinates(Global_Coordinates(374619700, -423795900, -293741100)); 
+        // TSTP::coordinates(Global_Coordinates(374619500, -423795600, -293740900)); 
     //  }
 
     //UFSC - Exutorio
@@ -75,7 +73,7 @@ void TSTP::Locator::bootstrap()
     //UFSC - BU
     // if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x59\x0e\x16\x06", 8)) { // Sink
     //     _here = TSTP::sink();
-        // TSTP::coordinates(Global_Coordinates(374665000, -423767000, -293725000));
+        // TSTP::coordinates(Global_Coordinates(374664800, -423766800, -293724900)); 
     //  }
 
     //UFSC - CDS
@@ -87,7 +85,7 @@ void TSTP::Locator::bootstrap()
     //UFSC - CCJ
     // if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x59\x0e\x16\x06", 8)) { // Sink
     //     _here = TSTP::sink();
-        // TSTP::coordinates(Global_Coordinates(374642900, -423784200, -293727600)); 
+        // TSTP::coordinates(Global_Coordinates(374642900, -423784700, -293727200)); 
     //  }
 
     //UFSC - Arquitetura
@@ -151,13 +149,13 @@ void TSTP::Locator::bootstrap()
     //    _here = Coordinates(-210, 120, 140);
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\xb7\x82\x0d\x06", 8)) // Router 3 (Guto's door)
     //    _here = Coordinates(-270, -110, 160);
-    // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x5e\x0e\x16\x06", 8)) // Door
+    // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x46\x5c\x3a\x06", 8)) // Door
     //    _here = Coordinates(-200, 150, 200);
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x0d\x3e\x3a\x06", 8)) // Presence
     //    _here = Coordinates(-720, -100, 0);
     // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\xc5\x3e\x3a\x06", 8)) // Perimeter sensor
     //    _here = Coordinates(-160, 452, -73);
-    // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x74\xb0\x0d\x06", 8)) // Temperature
+    // else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x31\xb0\x0d\x06", 8)) // Temperature
     //    _here = Coordinates(-200, 100, 0);
     // else
     //    _confidence = 0;
@@ -203,8 +201,7 @@ void TSTP::Locator::bootstrap()
     //        _here = Coordinates(345, 570, -40);
     //    else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x22\x83\x0d\x06", 8)) // Lux 0
     //        _here = Coordinates(15, 0, 0);
-    //    else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x56\xb0\x0d\x06", 8)) // Temperature 0
-    //    //else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\xa4\x82\x0d\x06", 8)) // Temperature 0
+    //    else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\xa4\x82\x0d\x06", 8)) // Temperature 0
     //        _here = Coordinates(10, 0, 0);
     //    else if(!memcmp(Machine::id(), "\x00\x4b\x12\x00\x51\x82\x0d\x06", 8)) // Air Conditioner 0
     //        _here = Coordinates(430, -10, 220);

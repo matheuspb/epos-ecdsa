@@ -8,6 +8,8 @@
 
 #include __MODEL_H
 
+#include <i2c.h>
+
 __BEGIN_SYS
 
 // TODO: It looks like this class only implements Master operation
@@ -32,7 +34,7 @@ public:
     // returns true if an error has occurred, false otherwise.
     bool put(unsigned char slave_address, char data, bool stop = true) {
         // Specify the slave address and that the next operation is a write (last bit = 0)
-        reg(I2C_SA) = slave_address << 1;
+        reg(I2C_SA) = 0x80;
         return send_byte(data, I2C_CTRL_RUN | I2C_CTRL_START | (stop ? I2C_CTRL_STOP : 0));
     }
 
@@ -86,22 +88,16 @@ public:
 
 private:
     bool send_byte(char data, int mode) {
-        unsigned int timeout;
-
         reg(I2C_DR) = data;
         reg(I2C_CTRL) = mode;
-
-        timeout = 1000;
-        while(ready_to_put() && --timeout);
+        while(ready_to_put());
         while(!ready_to_put());
         return (reg(I2C_STAT) & (I2C_STAT_ERROR | I2C_STAT_ADRACK | I2C_STAT_DATACK));
     }
 
     bool get_byte(char *data, int mode) {
-        unsigned int timeout;
         reg(I2C_CTRL) = mode;
-        timeout = 1000;
-        while(ready_to_put() && --timeout);
+        while(ready_to_put());
         while(!ready_to_put());
         if(reg(I2C_STAT) & (I2C_STAT_ERROR | I2C_STAT_ADRACK | I2C_STAT_DATACK)) {
             return true;
@@ -151,17 +147,18 @@ public:
         return ret;
     }
 
-    static float relative_humidity(I2C * i2c) {
+    static int relative_humidity(I2C * i2c) {
         char data[2];
         if (i2c->put(I2C_ADDR, RH_HOLD, false))
-            return 0xEFFFFFFF; // error
+            return -32768; // error
 
         if (i2c->get(I2C_ADDR, data, 2, true))
-            return 0xEFFFFFFF; // error
+            return -32768; // error
 
-        int tmp = (data[0] << 8 ) | data[1];
-        tmp = (1250 * tmp) / 65536 - 60;
-        float ret = (tmp / 10.0);
+        int ret = (data[0] << 8 ) | data[1];
+
+        ret = (1250 * ret) / 65536 - 60;
+        ret = (ret + 5) / 10;
 
         // the measured value of %RH may be slightly greater than 100
         // when the actual RH level is close to or equal to 100
@@ -170,17 +167,18 @@ public:
         return ret;
     }
 
-    static float celsius(I2C * i2c) {
+    static int celsius(I2C * i2c) {
         char data[2];
         if (i2c->put(I2C_ADDR, TEMP_HOLD, false))
-            return -1.0; // error
+            return -32768; // error
 
         if (i2c->get(I2C_ADDR, data, 2, true))
-            return -1.0; // error
+            return -32768; // error
 
-        int tmp = (data[0] << 8) | data[1];
-        tmp = (((17572 * tmp)) >> 16) - 4685;
-        return (tmp / 100.0);
+        int ret = (data[0] << 8) | data[1];
+        ret = (((17572 * ret)) >> 16) - 4685;
+        ret = (ret + 50) / 100;
+        return ret;
     }
 };
 
@@ -190,7 +188,7 @@ class I2C_Temperature_Sensor: private I2C_Sensor_Engine
 public:
     I2C_Temperature_Sensor(char port_sda = 'B', unsigned int pin_sda = 1, char port_scl = 'B', unsigned int pin_scl = 0) : _i2c(I2C_Common::MASTER, port_sda, pin_sda, port_scl, pin_scl) { I2C_Sensor_Engine::reset(&_i2c); }
 
-    float get() { while(!_i2c.ready_to_get()); return I2C_Sensor_Engine::celsius(&_i2c); }
+    int get() { while(!_i2c.ready_to_get()); return I2C_Sensor_Engine::celsius(&_i2c); }
 
 private:
     I2C _i2c;
@@ -201,7 +199,7 @@ class I2C_Humidity_Sensor: private I2C_Sensor_Engine
 public:
     I2C_Humidity_Sensor(char port_sda = 'B', unsigned int pin_sda = 1, char port_scl = 'B', unsigned int pin_scl = 0) : _i2c(I2C_Common::MASTER, port_sda, pin_sda, port_scl, pin_scl) { I2C_Sensor_Engine::reset(&_i2c); }
 
-    float get() { while(!_i2c.ready_to_get()); return I2C_Sensor_Engine::relative_humidity(&_i2c); }
+    int get() { while(!_i2c.ready_to_get()); return I2C_Sensor_Engine::relative_humidity(&_i2c); }
 
 private:
     I2C _i2c;

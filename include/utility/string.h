@@ -18,7 +18,6 @@ extern "C" {
     char * strchr(const char * s, int c);
     char * strrchr(const char * s, int c);
     size_t strlen(const char * s);
-    int strstr(const char * s1, const char * s2);
     long atol(const char * s);
     char * itoa(int v, char * s);
     int utoa(unsigned long v,char * d);

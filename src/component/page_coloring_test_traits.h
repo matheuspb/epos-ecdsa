@@ -382,7 +382,7 @@ template<> struct Traits<TSTP>: public Traits<Network>
     static const unsigned int KEY_SIZE = 16;
 };
 
-template <typename S> struct Traits<Smart_Data<S>>: public Traits<Network>
+template<> template <typename S> struct Traits<Smart_Data<S>>: public Traits<Network>
 {
     static const bool enabled = NETWORKS::Count<TSTP>::Result;
 };

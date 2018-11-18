@@ -400,19 +400,6 @@ extern "C"
         return (rtnval);
     }
 
-    int strstr(const char * s1, const char * s2)
-    {
-        unsigned int currentMatch = 0;
-        size_t s1_len = strlen(s1);
-        size_t s2_len = strlen(s2);
-        for(unsigned int i = 0; i < s1_len; i++) {
-            if(s1[i] == s2[currentMatch]) {
-                if(++currentMatch == s2_len) return i - currentMatch + 1; // may or may not be off by one
-            }else currentMatch = 0;
-        }
-        return -1;
-    }
-
     long atol(const char *s)
     {
         long ret=0; bool neg=false;
@@ -468,24 +455,18 @@ extern "C"
         for(j = v; j != 0; i++, j /= 10);
         for(j = 0; v != 0; j++, v /= 10)
             dst[i - 1 - j] = '0' + (v % 10);
-        dst[i]=0;
         return i;
     }
 
     int atoi(const char *s)
     {
-        long i=0; bool neg=false;
-
-        if (*s == '-') {
-            neg = true;
-            ++s;
-        }
-
+        int i;
+        i = 0;
         while(*s) {
             i = (i << 3) + (i << 1) + (*s - '0');
             s++;
             // Dont increment i!
         }
-        return neg ? -i : i;
+        return i;
     }
 }
