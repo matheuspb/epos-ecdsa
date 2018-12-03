@@ -13,13 +13,34 @@ template<> struct Traits<Machine_Common>: public Traits<void>
     static const bool debugged = Traits<void>::debugged;
 };
 
+class PUF;
+template<> struct Traits<PUF>
+{
+    static const unsigned int KEY_SIZE = 256;
+    static const unsigned int KEY_SIZE_BYTES = static_cast<unsigned int>((static_cast<signed int>(KEY_SIZE) - 1) + 8) / 8;
+};
+
+class BCH;
+template<> struct Traits<BCH>
+{
+  static const unsigned int CHUNK_SIZE = 32;
+  static const unsigned int TEST_CHUNK_SIZE = (CHUNK_SIZE + 8);
+  static const unsigned int SYNS_SIZE = 2;
+  static const unsigned int GENERATOR = 0x201b;
+  static const unsigned int POLY_DEGREE = 13;
+  static const unsigned int ECC_BYTES = 2;
+};
+
 template<> struct Traits<Machine>: public Traits<Machine_Common>
 {
     static const unsigned int CPUS = Traits<Build>::CPUS;
-
+    static const unsigned int MEM_BEG    = 0x20000004;
+    static const unsigned int MEM_END    = 0x20007ff7; // 32 KB (MAX for 32-bit is 0x70000000 / 1792 MB)
     // Physical Memory
-    static const unsigned int MEM_BASE   = 0x20000004;
-    static const unsigned int MEM_TOP    = 0x20007ff7; // 32 KB (MAX for 32-bit is 0x70000000 / 1792 MB)
+    static const unsigned int MEM_BASE   = MEM_BEG;
+    static const unsigned int MEM_TOP    = 0x20007ef7;
+    static const unsigned int PUF_BASE   = MEM_TOP + 1; // One past last byte
+    static const unsigned int PUF_END    = PUF_BASE + (static_cast<unsigned int>((static_cast<signed int>(Traits<PUF>::KEY_SIZE_BYTES) - 1) + 4) / 4) * 4;
     static const unsigned int FLASH_BASE = 0x00200000;
     static const unsigned int FLASH_TOP  = 0x0027ffff; // 512 KB
 
