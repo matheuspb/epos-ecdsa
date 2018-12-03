@@ -441,7 +441,7 @@ public:
     };
 
     ECDSA():
-        d(zero, Curve::size*4),
+        d((uint32_t *) Traits<Machine>::PUF_BASE, Curve::size*4),
         n(Curve::n, Curve::size*4)
     {}
 
