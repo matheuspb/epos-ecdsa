@@ -1,6 +1,6 @@
 // EPOS PUF Key Generation Test Program
 
-#include <utility/bch.h>
+#include <utility/puf.h>
 
 using namespace EPOS;
 

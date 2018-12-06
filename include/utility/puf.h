@@ -1,7 +1,7 @@
-// EPOS BCH Correction Code Module
+// EPOS Physical Unclonable Functions Module
 
-#ifndef __bch_h
-#define __bch_h
+#ifndef __puf_h
+#define __puf_h
 
 #define MAX_POLY 16
 

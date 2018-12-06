@@ -2,7 +2,7 @@
 
 #include <persistent_storage.h>
 #include <utility/random.h>
-#include <utility/bch.h>
+#include <utility/puf.h>
 
 using namespace EPOS;
 
