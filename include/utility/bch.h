@@ -5,9 +5,9 @@
 
 #define MAX_POLY 16
 
-#include <system/config.h>
 #include <utility/string.h>
 #include <utility/galois.h>
+#include <persistent_storage.h>
 #include <riffs.h>
 
 __BEGIN_SYS
@@ -211,6 +211,63 @@ private:
         }
 
         memcpy(sigma, C, MAX_POLY);
+    }
+
+};
+
+class PUF {
+
+public:
+    static void bootstrap() {
+        char* SRAM_BEG = reinterpret_cast<char*>(Traits<Machine>::PUF_BASE);
+        char* SRAM_END = reinterpret_cast<char*>(Traits<Machine>::PUF_END);
+
+        unsigned int FLASH_END = Traits<Machine>::FLASH_STORAGE_TOP;
+
+        uint16_t bch_size = Traits<BCH>::TEST_CHUNK_SIZE;
+        uint16_t input_size = Traits<BCH>::CHUNK_SIZE;
+
+        uint8_t block[bch_size];
+
+        int index = 0;
+        while(SRAM_BEG != SRAM_END) {
+            block[index] = *SRAM_BEG++;
+            index++;
+        }
+
+        BCH_Wrapper<BCH_Standard_Def>::bch_generate(block, input_size, block + input_size);
+
+        Persistent_Storage::write((Persistent_Storage::SIZE - 3) - (sizeof(Persistent_Storage::Word) * 18), block, bch_size);
+    }
+
+    static uint8_t* read_sram() {
+        char* SRAM_BEG = reinterpret_cast<char*>(Traits<Machine>::PUF_BASE);
+        char* SRAM_END = reinterpret_cast<char*>(Traits<Machine>::PUF_END);
+
+        uint16_t bch_size = (Traits<BCH>::TEST_CHUNK_SIZE);
+        uint16_t input_size = (Traits<BCH>::CHUNK_SIZE);
+        uint8_t* block = new uint8_t[bch_size];
+
+        unsigned int FLASH_END = Traits<Machine>::FLASH_STORAGE_TOP;
+        unsigned int ECC_FLASH_BEG = (Persistent_Storage::SIZE - 3) - (sizeof(Persistent_Storage::Word) * 2);
+
+        for (uint16_t i = input_size; i < bch_size; i++) {
+            Persistent_Storage::read(ECC_FLASH_BEG++, &block[i], sizeof(uint8_t));
+        }
+
+        int index = 0;
+        while(SRAM_BEG != SRAM_END) {
+            block[index] = *SRAM_BEG++;
+            index++;
+        }
+
+        BCH_Wrapper<BCH_Standard_Def>::repair(block, input_size, block + input_size);
+        bool test = BCH_Wrapper<BCH_Standard_Def>::verify(block, input_size, block + input_size);
+
+        if (test)
+            return block;
+        else
+            return 0;
     }
 
 };

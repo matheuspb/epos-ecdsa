@@ -1,7 +1,6 @@
 #ifndef __ecdsa_h
 #define __ecdsa_h
 
-#include <stdint.h>
 #include <pka.h>
 #include <utility/hwbignum.h>
 
@@ -441,7 +440,7 @@ public:
     };
 
     ECDSA():
-        d((uint32_t *) Traits<Machine>::PUF_BASE, Curve::size*4),
+        d(zero, Curve::size*4),
         n(Curve::n, Curve::size*4)
     {}
 
