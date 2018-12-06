@@ -7,15 +7,15 @@
 // ARCHITECTURE, MACHINE, AND APPLICATION SELECTION
 // This section is generated automatically from makedefs by $EPOS/etc/makefile
 //============================================================================
-#define MODE xxx
-#define ARCH xxx
-#define MACH xxx
-#define MMOD xxx
-#define APPL xxx
-#define __mode_xxx__
-#define __arch_xxx__
-#define __mach_xxx__
-#define __mmod_xxx__
+#define MODE library
+#define ARCH armv7
+#define MACH cortex
+#define MMOD emote3
+#define APPL ecdsa_hardware
+#define __mode_library__
+#define __arch_armv7__
+#define __mach_cortex__
+#define __mmod_emote3__
 
 #if defined (__arch_avr__)
 #define __no_networking__
@@ -147,6 +147,7 @@ namespace EPOS {
 #define __CAN_H                 __HEADER_MACH(can)
 #define __GNSS_H                __HEADER_MACH(a2035)
 #define __IMU_H                 __HEADER_MACH(lsm330)
+#define __ECDSA_H               __HEADER_MACH(ecdsa)
 #endif
 
 #ifdef __mmod_zynq__

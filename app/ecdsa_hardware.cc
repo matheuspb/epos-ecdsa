@@ -1,6 +1,6 @@
-// EPOS RSA hardware Test Program
+// EPOS ECDSA hardware Test Program
 
-#include <utility/ecdsa.h>
+#include <ecdsa.h>
 #include <utility/hwbignum.h>
 
 using namespace EPOS;

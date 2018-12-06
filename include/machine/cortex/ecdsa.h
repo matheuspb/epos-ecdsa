@@ -1,5 +1,5 @@
-#ifndef __ecdsa_h
-#define __ecdsa_h
+#ifndef __machine_cortex_ecdsa_h
+#define __machine_cortex_ecdsa_h
 
 #include <pka.h>
 #include <utility/hwbignum.h>
@@ -425,7 +425,7 @@ private:
 };
 
 template<typename Curve>
-class ECDSA {
+class ECDSA : public ECDSA_Common {
 
     typedef ECPoint<Curve> Point;
     typedef HWBignum Scalar;
