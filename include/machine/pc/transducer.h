@@ -15,7 +15,8 @@ typedef TSTP::Coordinates Coordinates;
 class Keyboard_Sensor: public Keyboard
 {
 public:
-    static const unsigned int UNIT = TSTP::Unit::Acceleration; // I32 by default
+    static const unsigned int UNIT = TSTP::Unit::Acceleration;
+    static const unsigned int NUM = TSTP::Unit::I32;
     static const int ERROR = 0; // Unknown
 
     static const bool INTERRUPT = true;

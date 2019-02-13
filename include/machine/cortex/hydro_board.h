@@ -23,14 +23,7 @@ public:
     typedef _UTIL::Observer Observer;
     typedef _UTIL::Observed Observed;
 
-    enum Port {
-        P3 = 0,
-        P4 = 1,
-        P5 = 2,
-        P6 = 3
-    };
-
-public:    
+public:
     static int rain() { return pulses(); }
 
     static int water_flow() { return pulses(); }
@@ -54,20 +47,10 @@ public:
         //Ultrassonic Level Trasmitter UL-R08-IP68 requires 
         //a minimum delay of 10s beteween relay-on/relay-off
         //and it is the maximum delay required so far
-        Machine::delay(20000000);
+        Machine::delay(10000000);
         int ret = read(dev);
         off(dev);
         return ret;
-    }
-
-    static GPIO * get_relay(Port port) {
-        return _relay[port];
-    }
-    static ADC * get_adc(Port port) {
-        return _adc[port];
-    }
-    static GPIO * get_pulse() {
-        return _pulses;
     }
 
     static void attach(Observer * obs) { _observed.attach(obs); }
@@ -79,8 +62,6 @@ private:
         _pulse_count = 0;
         return ret;
     }
-
-public:
     static void on(unsigned int dev) {
         assert(dev < 4);
         _relay[dev]->set();

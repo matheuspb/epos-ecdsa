@@ -93,7 +93,7 @@ public: //TODO: for debugging
     static const unsigned int OFFSET_GENERAL_LOWER_BOUND = OFFSET_LOWER_BOUND + 3 * G;
     static const unsigned int OFFSET_UPPER_BOUND = SLEEP_PERIOD - CCA_TIME - Radio::RX_TO_TX_DELAY - MICROFRAME_TIME;
     static const unsigned int OFFSET_GENERAL_UPPER_BOUND = OFFSET_UPPER_BOUND - 3 * G;
-    static const unsigned int REGION_FLOODING_TX_TIMES = 1;
+
 
 protected:
     TSTP_MAC(unsigned int unit) : _unit(unit) {
@@ -137,15 +137,11 @@ protected:
                     last_hint = mf->hint();
 
                     buf->id = last_id;
-                    buf->id_seen_before = false;
                     buf->downlink = mf->all_listen();
                     buf->is_new = false;
                     buf->is_microframe = true;
                     buf->microframe_count = mf->count();
                     buf->offset = OFFSET_GENERAL_UPPER_BOUND;
-                    buf->progress_bits = 0;
-                    buf->times_txed = 0;
-                    buf->ack = false;
 
                     // Forge a TSTP identifier to make the radio notify listeners
                     mf->all_listen(false);
@@ -183,7 +179,6 @@ protected:
 
                 // Initialize Buffer Metainformation
                 buf->id = id;
-                buf->id_seen_before = false;
                 buf->downlink = mf->all_listen();
                 buf->is_new = false;
                 buf->is_microframe = true;
@@ -192,9 +187,7 @@ protected:
                 buf->hint = mf->hint();
                 buf->microframe_count = mf->count();
                 buf->offset = OFFSET_GENERAL_UPPER_BOUND;
-                buf->progress_bits = 0;
                 buf->times_txed = 0;
-                buf->ack = false;
 
                 // Forge a TSTP identifier to make the radio notify listeners
                 mf->all_listen(false);
@@ -218,7 +211,6 @@ protected:
 
             // Initialize Buffer Metainformation
             buf->id = TSTP_Common::id(buf->frame()->data<TSTP_Common::Frame>());
-            buf->id_seen_before = false;
             buf->hint = _receiving_data_hint;
             buf->is_new = false;
             buf->is_microframe = false;
@@ -226,9 +218,7 @@ protected:
             buf->random_backoff_exponent = 0;
             buf->microframe_count = 0;
             buf->offset = OFFSET_GENERAL_UPPER_BOUND;
-            buf->progress_bits = 0;
             buf->times_txed = 0;
-            buf->ack = false;
 
             // Clear scheduled messages that are equivalent
             Buffer::Element * next;
@@ -236,7 +226,7 @@ protected:
                 next = el->next();
                 Buffer * queued_buf = el->object();
                 if(equals(queued_buf, buf)) {
-                    if(!queued_buf->ack) {
+                    if(!queued_buf->destined_to_me) {
                         db<TSTP_MAC<Radio>>(TRC) << "TSTP_MAC::pre_notify: ACK received, ID=" << queued_buf->id << endl;
                         _tx_schedule.remove(el);
                         delete queued_buf;
@@ -340,7 +330,7 @@ public:
 
         buf->offset = Timer::us2count(buf->offset);
 
-        if(buf->ack)
+        if(buf->destined_to_me)
             buf->offset = Timer::us2count(OFFSET_LOWER_BOUND);
         else {
             if(buf->offset < Timer::us2count(OFFSET_GENERAL_LOWER_BOUND))
@@ -408,14 +398,11 @@ private:
                 if(drop_expired && (b->deadline <= now_us)) {
                     _tx_schedule.remove(el);
                     delete b;
-                } else if(!b->is_new && b->destined_to_me && b->times_txed >= REGION_FLOODING_TX_TIMES){
-                    _tx_schedule.remove(el);
-                    delete b;
                 } else if(!_tx_pending) {
                     _tx_pending = b;
                 // Prioritize ACKs
-                } else if(_tx_pending->ack) {
-                    if(b->ack) {
+                } else if(_tx_pending->destined_to_me) {
+                    if(b->destined_to_me) {
                         if(b->times_txed < _tx_pending->times_txed)
                             _tx_pending = b;
                         else if((b->times_txed == _tx_pending->times_txed)
@@ -462,7 +449,7 @@ private:
                 unsigned int lim = G * _tx_pending->random_backoff_exponent;
                 if((lim > Timer::us2count(OFFSET_UPPER_BOUND)) || (lim == 0))
                     lim = Timer::us2count(OFFSET_UPPER_BOUND);
-                if(_tx_pending->ack) {
+                if(_tx_pending->destined_to_me) {
                     offset -= ((unsigned int) (Random::random()) % lim);
                     if((offset < Timer::us2count(OFFSET_LOWER_BOUND)) || (offset > Timer::us2count(OFFSET_GENERAL_LOWER_BOUND))) {
                         offset = Timer::us2count(OFFSET_LOWER_BOUND);
@@ -481,12 +468,10 @@ private:
                 }
             }
 
-            // TODO: that about models that should not be flooded
             bool is_model = (_tx_pending->frame()->data<Header>()->type() == CONTROL)
                             && (_tx_pending->frame()->data<Control>()->subtype() == MODEL);
 
-            // TODO: all_listen if this package needs to be flooded
-            new (&_mf) Microframe(((!_tx_pending->ack) && _tx_pending->downlink) || (is_model),
+            new (&_mf) Microframe(((!_tx_pending->destined_to_me) && _tx_pending->downlink) || (is_model),
                     _tx_pending->id, N_MICROFRAMES - 1, _tx_pending->hint);
 
             Radio::copy_to_nic(&_mf, sizeof(Microframe));
@@ -627,7 +612,7 @@ private:
 
             _tx_pending->times_txed++;
 
-            if(silence && !is_keep_alive && !_tx_pending->ack) {
+            if(silence && !is_keep_alive && !_tx_pending->destined_to_me) {
                 unsigned int r = Random::random();
                 _silence_periods += (r % _tx_pending->times_txed) + 1;
             }
@@ -637,7 +622,7 @@ private:
             _mf_time = Timer::read();
 
             // Keep Alive messages are never ACK'ed or forwarded
-            if(is_keep_alive || _tx_pending->ack) {
+            if(is_keep_alive || _tx_pending->destined_to_me) {
                 _tx_schedule.remove(_tx_pending->link());
                 delete _tx_pending;
                 _tx_pending = 0;

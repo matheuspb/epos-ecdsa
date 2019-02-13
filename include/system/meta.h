@@ -24,14 +24,6 @@ template<int Then, int Else>
 struct IF_INT<false, Then, Else>
 { enum { Result = Else }; };
 
-// Conditional Boolean
-template<bool condition>
-struct IF_BOOL
-{ static const bool Result = true; };
-
-template<>
-struct IF_BOOL<false>
-{ static const bool Result = false; };
 
 // SWITCH-CASE of Types
 const int DEFAULT = ~(~0u >> 1); // Initialize with the smallest int

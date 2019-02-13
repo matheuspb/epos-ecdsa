@@ -125,7 +125,6 @@ class A2035;
 class AT86RF;
 class GEM;
 class RFID_Reader;
-class LSM330;
 
 // Components
 class System;

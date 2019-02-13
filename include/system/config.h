@@ -105,8 +105,6 @@ namespace EPOS {
 #define __NIC_H         __HEADER_MACH(nic)
 #define __FPGA_H        __HEADER_MACH(fpga)
 #define __AES_H         __HEADER_MACH(aes)
-#define __SHA_H         __HEADER_MACH(sha)
-#define __RSA_H         __HEADER_MACH(rsa)
 #endif
 
 #ifdef __mmod_lm3s811__
@@ -118,8 +116,6 @@ namespace EPOS {
 #define __NIC_H                 __HEADER_MACH(nic)
 #define __GPIO_H                __HEADER_MACH(gpio)
 #define __AES_H                 __HEADER_MACH(aes)
-#define __SHA_H         		__HEADER_MACH(sha)
-#define __RSA_H         		__HEADER_MACH(rsa)
 #endif
 
 #ifdef __mmod_emote3__
@@ -134,6 +130,7 @@ namespace EPOS {
 #define __I2C_H                 __HEADER_MACH(i2c)
 #define __GPIO_H                __HEADER_MACH(gpio)
 #define __ADC_H                 __HEADER_MACH(adc)
+#define __RS485_H               __HEADER_MACH(rs485)
 #define __SMART_PLUG_H          __HEADER_MACH(smart_plug)
 #define __HYDRO_BOARD_H         __HEADER_MACH(hydro_board)
 #define __PWM_H                 __HEADER_MACH(pwm)
@@ -142,8 +139,6 @@ namespace EPOS {
 #define __WATCHDOG_H            __HEADER_MACH(watchdog)
 #define __NIC_H                 __HEADER_MACH(nic)
 #define __AES_H                 __HEADER_MACH(aes)
-#define __SHA_H         		__HEADER_MACH(sha)
-#define __RSA_H         		__HEADER_MACH(rsa)
 #define __CAN_H                 __HEADER_MACH(can)
 #define __GNSS_H                __HEADER_MACH(a2035)
 #define __IMU_H                 __HEADER_MACH(lsm330)
@@ -158,8 +153,6 @@ namespace EPOS {
 #define __UART_H                __HEADER_MACH(uart)
 #define __NIC_H                 __HEADER_MACH(nic)
 #define __AES_H                 __HEADER_MACH(aes)
-#define __SHA_H         		__HEADER_MACH(sha)
-#define __RSA_H         		__HEADER_MACH(rsa)
 #endif
 
 //============================================================================

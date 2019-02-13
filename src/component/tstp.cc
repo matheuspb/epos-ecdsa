@@ -140,9 +140,7 @@ void TSTP::Timekeeper::marshal(Buffer * buf)
             buf->frame()->data<Header>()->time_request(false);
     }
 
-    if((buf->frame()->data<Header>()->type() != RESPONSE) && ((buf->frame()->data<Header>()->type() == CONTROL) && (buf->frame()->data<Control>()->subtype() != MODEL)))
-        buf->frame()->data<Header>()->time(now());
-
+    buf->frame()->data<Header>()->time(now());
     buf->deadline = TSTP::destination(buf).t1; // deadline must be set after origin time for Security messages
 }
 
@@ -169,7 +167,7 @@ void TSTP::Router::update(NIC::Observed * obs, NIC::Protocol prot, Buffer * buf)
             buf->destined_to_me = false;
         else {
             Region dst = TSTP::destination(buf);
-            buf->ack = buf->destined_to_me = ((header->origin() != TSTP::here()) && (dst.contains(TSTP::here(), dst.t0)));
+            buf->destined_to_me = ((header->origin() != TSTP::here()) && (dst.contains(TSTP::here(), dst.t0)));
 
             if(forward(buf)) {
 
@@ -184,7 +182,6 @@ void TSTP::Router::update(NIC::Observed * obs, NIC::Protocol prot, Buffer * buf)
                 send_buf->size(buf->size());
                 send_buf->id = buf->id;
                 send_buf->destined_to_me = buf->destined_to_me;
-                send_buf->ack = buf->ack;
                 send_buf->downlink = buf->downlink;
                 send_buf->deadline = buf->deadline;
                 send_buf->my_distance = buf->my_distance;
@@ -192,7 +189,6 @@ void TSTP::Router::update(NIC::Observed * obs, NIC::Protocol prot, Buffer * buf)
                 send_buf->is_new = false;
                 send_buf->is_microframe = false;
                 send_buf->random_backoff_exponent = 0;
-                send_buf->progress_bits = buf->progress_bits;
 
                 // Calculate offset
                 offset(send_buf);
@@ -220,8 +216,7 @@ void TSTP::Router::marshal(Buffer * buf)
     buf->downlink = dest.center != TSTP::sink();
     buf->destined_to_me = (buf->frame()->data<Header>()->origin() != TSTP::here()) && (dest.contains(TSTP::here(), TSTP::now()));
     buf->hint = buf->my_distance;
-    buf->progress_bits = 0x01;
-    buf->ack = false;
+
     offset(buf);
 }
 
@@ -492,7 +487,6 @@ TSTP::Security::~Security()
 NIC * TSTP::_nic;
 TSTP::Interests TSTP::_interested;
 TSTP::Responsives TSTP::_responsives;
-TSTP::Seen_IDs TSTP::_seen_ids;
 TSTP::Observed TSTP::_observed;
 TSTP::Time TSTP::_epoch;
 TSTP::Global_Coordinates TSTP::_global_coordinates;
@@ -515,7 +509,6 @@ void TSTP::update(NIC::Observed * obs, NIC::Protocol prot, Buffer * buf)
 
     bool is_model = (packet->type() == CONTROL && buf->frame()->data<Control>()->subtype() == MODEL);
 
-    // TODO: change to be more generic
     if(is_model && buf->frame()->data<Control>()->origin() != here()) {
         Model * model = reinterpret_cast<Model *>(packet);
         if(model->time() < now()) {
@@ -541,7 +534,7 @@ void TSTP::update(NIC::Observed * obs, NIC::Protocol prot, Buffer * buf)
         }
     }
 
-    if(packet->time() > now() || !buf->destined_to_me || buf->id_seen_before)
+    if(packet->time() > now() || !buf->destined_to_me)
         return;
 
     switch(packet->type()) {

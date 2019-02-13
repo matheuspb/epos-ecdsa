@@ -15,7 +15,7 @@ M95::Device M95::_devices[M95::UNITS];
 // Methods
 int M95::send_command(const char *command, unsigned int size)
 {
-    db<M95>(WRN) << "M95::send_command(c=" << command << ",sz=" << size << ")" << endl;
+    db<M95>(TRC) << "M95::send_command(c=" << command << ",sz=" << size << ")" << endl;
 
     if(_uart->ready_to_get())
         while(_uart->ready_to_get())
@@ -42,7 +42,7 @@ int M95::send_command(const char *command, unsigned int size)
     _uart->put('\r');
 
     if((!memcmp(command, "AT+QHTTPURL=", strlen("AT+QHTTPURL="))) || (!memcmp(command, "AT+QHTTPPOST=", strlen("AT+QHTTPPOST=")))) {
-        _http_data_mode = wait_response("CONNECT", 10000000);
+        _http_data_mode = wait_response("CONNECT", 5000000);
         return _http_data_mode * size;
     }
 
@@ -51,7 +51,7 @@ int M95::send_command(const char *command, unsigned int size)
 
 int M95::send_data(const char * data, unsigned int size)
 {
-    db<M95>(WRN) << "M95::send_data: " << size << " bytes" << endl;
+    db<M95>(TRC) << "M95::send_data: " << size << " bytes" << endl;
 
     if(_uart->ready_to_get())
         while(_uart->ready_to_get())
@@ -67,7 +67,7 @@ int M95::send_data(const char * data, unsigned int size)
 
 // Assumes "expected" is null-terminated.
 bool M95::wait_response(const char * expected, const RTC::Microsecond & timeout, char * response, unsigned int response_size) {
-    db<M95>(WRN) << "M95::wait_response(ex=" << expected << ",tmt=" << timeout << ")" << endl;
+    db<M95>(TRC) << "M95::wait_response(ex=" << expected << ",tmt=" << timeout << ")" << endl;
 
     TSC::Time_Stamp end = TSC::time_stamp() + timeout * TSC::frequency() / 1000000;
 
@@ -86,7 +86,7 @@ bool M95::wait_response(const char * expected, const RTC::Microsecond & timeout,
         }
 
         char c = _uart->get();
-        db<M95>(WRN) << c;
+        db<M95>(TRC) << c;
         if(c == expected[i])
             i++;
         else if(c == expected[0])

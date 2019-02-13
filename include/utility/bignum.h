@@ -14,7 +14,6 @@ template<unsigned int SIZE>
 class Bignum
 {
     template<typename Cipher> friend class Poly1305;
-    friend class RSA;
 
 public:
     typedef unsigned int Digit;
@@ -41,7 +40,6 @@ public:
         *this = n;
     }
     Bignum(const void * bytes, unsigned int len) {
-        _len = len / 4;
         for(unsigned int i = 0, j = 0; i < DIGITS; i++) {
             _data[i] = 0;
             for(unsigned int k = 0; k < sizeof(Digit) && j < len; k++, j++)
@@ -76,7 +74,6 @@ public:
     }
 
     void operator=(const Bignum & b) {
-        _len = b._len;
         for(unsigned int i = 0; i < DIGITS; i++)
             _data[i] = b._data[i];
     }
@@ -235,18 +232,6 @@ public:
                 *this -= A;
             }
         }
-    }
-
-    void printResult(OStream & cout)
-    {
-        unsigned char* Message_Digest = (unsigned char *)_data;
-        const char hexdigits[ ] = "0123456789ABCDEF";
-        int i;
-        for (i = _len*4; i >= 0; --i) {
-          cout << (hexdigits[(Message_Digest[i] >> 4) & 0xF]);
-          cout << (hexdigits[Message_Digest[i] & 0xF]);
-        }
-        cout << endl;
     }
 
     friend OStream &operator<<(OStream & out, const Bignum & b){
@@ -414,8 +399,6 @@ private:
 
 private:
     Word _data;
-    // Length in bytes
-    unsigned int _len;
 
     static const _Word _mod;
     static const _Barrett _barrett_u;
